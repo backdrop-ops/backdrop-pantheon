@@ -523,3 +523,73 @@ $conf['404_fast_html'] = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN"
  * built for Backdrop.
  */
 $settings['backdrop_drupal_compatibility'] = TRUE;
+
+/**
+ * Pantheon specific compatibility.
+ *
+ * Add the CMI Directory Information directly in settings.php to make sure
+ * Backdrop knows all about that.
+ */
+if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
+  if ($_SERVER['SCRIPT_NAME'] == '/core/install.php') {
+    $config_directories = array(
+      'active' => 'sites/default/files/config/active',
+      'staging' => 'sites/default/files/config',
+    );
+  }
+  else {
+    $config_directories = array(
+      'active' => 'sites/default/config/active',
+      'staging' => 'sites/default/config',
+    );
+  }
+}
+
+/**
+ * Pantheon specific compatibility.
+ *
+ * Override the $install_state variable to let Backdrop know that the settings are verified
+ * since they are being passed directly by the Pantheon.
+ */
+if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
+  $GLOBALS['install_state']['settings_verified'] = TRUE;
+}
+
+/**
+ * Pantheon specific compatibility.
+ *
+ * Override the $databases variable to pass the correct Database credentials
+ * directly from Pantheon to Backdrop.
+ */
+if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
+  $pressflow_settings = json_decode($_SERVER['PRESSFLOW_SETTINGS'], TRUE);
+  foreach ($pressflow_settings as $key => $value) {
+    // One level of depth should be enough for $conf and $database.
+    if ($key == 'conf') {
+      foreach($value as $conf_key => $conf_value) {
+        $conf[$conf_key] = $conf_value;
+      }
+    }
+    elseif ($key == 'databases') {
+      // Protect default configuration but allow the specification of
+      // additional databases. Also, allows fun things with 'prefix' if they
+      // want to try multisite.
+      if (!isset($databases) || !is_array($databases)) {
+        $databases = array();
+      }
+      $databases = array_replace_recursive($databases, $value);
+    }
+    else {
+      $$key = $value;
+    }
+  }
+}
+
+/**
+ * Pantheon specific compatibility.
+ *
+ * Handle Hash Salt Value for Backdrop.
+ */
+if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
+  $settings['hash_salt'] = hash('sha256', serialize($databases));
+}
