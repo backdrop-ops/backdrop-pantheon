@@ -1,0 +1,168 @@
+<?php
+
+/**
+ * @file
+ * Add language handling functionality to Backdrop.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function language_menu() {
+  $items['admin/config/regional/language'] = array(
+    'title' => 'Languages',
+    'description' => 'Configure languages for content and the user interface.',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('language_admin_overview_form'),
+    'access arguments' => array('administer languages'),
+    'file' => 'language.admin.inc',
+    'weight' => -10,
+  );
+  $items['admin/config/regional/language/list'] = array(
+    'title' => 'List',
+    'weight' => 0,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['admin/config/regional/language/add'] = array(
+    'title' => 'Add language',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('language_admin_add_form'),
+    'access arguments' => array('administer languages'),
+    'weight' => 5,
+    'type' => MENU_LOCAL_ACTION,
+    'file' => 'language.admin.inc',
+  );
+  $items['admin/config/regional/language/edit/%language'] = array(
+    'title' => 'Edit language',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('language_admin_edit_form', 5),
+    'access arguments' => array('administer languages'),
+    'file' => 'language.admin.inc',
+  );
+  $items['admin/config/regional/language/delete/%language'] = array(
+    'title' => 'Confirm delete',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('language_admin_delete_form', 5),
+    'access arguments' => array('administer languages'),
+    'file' => 'language.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function language_permission() {
+  return array(
+    'administer languages' => array(
+      'title' => t('Administer languages'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_theme().
+ */
+function language_theme() {
+  return array(
+    'language_admin_overview_form_table' => array(
+      'render element' => 'form',
+      'file' => 'language.admin.inc',
+    ),
+  );
+}
+
+/**
+ * API function to add or update a language.
+ *
+ * @param $language
+ *   Language object with properties corresponding to 'language' table columns.
+ */
+function language_save($language) {
+  $language->is_new = !(bool) db_query_range('SELECT 1 FROM {language} WHERE langcode = :langcode', 0, 1, array(':langcode' => $language->langcode))->fetchField();
+
+  // If name was not set, we add a predefined language.
+  if (!isset($language->name)) {
+    include_once BACKDROP_ROOT . '/core/includes/standard.inc';
+    $predefined = standard_language_list();
+    $language->name = $predefined[$language->langcode][0];
+    $language->direction = isset($predefined[$language->langcode][2]) ? $predefined[$language->langcode][2] : LANGUAGE_LTR;
+  }
+
+  // Set to enabled for the default language and unless specified otherwise.
+  if (!empty($language->default) || !isset($language->enabled)) {
+    $language->enabled = TRUE;
+  }
+  // Let other modules modify $language before saved.
+  module_invoke_all('language_presave', $language);
+
+  // Save the record and inform others about the change.
+  $t_args = array('%language' => $language->name, '%langcode' => $language->langcode);
+  if ($language->is_new) {
+    backdrop_write_record('language', $language);
+    module_invoke_all('language_insert', $language);
+    watchdog('language', 'The %language (%langcode) language has been created.', $t_args);
+  }
+  else {
+    backdrop_write_record('language', $language, array('langcode'));
+    module_invoke_all('language_update', $language);
+    watchdog('language', 'The %language (%langcode) language has been updated.', $t_args);
+  }
+
+  if (!empty($language->default)) {
+    // Set the new version of this language as default in a variable.
+    $default_language = language_default();
+    variable_set('language_default', $language);
+  }
+
+  // Update language count based on enabled language count.
+  variable_set('language_count', db_query('SELECT COUNT(langcode) FROM {language} WHERE enabled = 1')->fetchField());
+
+  // Kill the static cache in language_list().
+  backdrop_static_reset('language_list');
+
+  return $language;
+}
+
+/**
+ * Delete a language.
+ *
+ * @param $langcode
+ *   Language code of the language to be deleted.
+ * @return
+ *   TRUE if language is successfully deleted. Otherwise FALSE.
+ */
+function language_delete($langcode) {
+  $languages = language_list();
+  if (isset($languages[$langcode])) {
+    $language = $languages[$langcode];
+
+    module_invoke_all('language_delete', $language);
+
+    // Remove the language.
+    db_delete('language')
+      ->condition('langcode', $language->langcode)
+      ->execute();
+
+    if ($language->enabled) {
+      variable_set('language_count', variable_get('language_count', 1) - 1);
+    }
+
+    backdrop_static_reset('language_list');
+
+    $t_args = array('%language' => $language->name, '%langcode' => $language->langcode);
+    watchdog('language', 'The %language (%langcode) language has been removed.', $t_args);
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_config_info().
+ */
+function language_config_info() {
+  $prefixes['language.negotiation'] = array(
+    'label' => t('Language negotiation'),
+    'group' => t('Configuration'),
+  );
+}

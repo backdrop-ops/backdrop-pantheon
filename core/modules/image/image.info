@@ -1,0 +1,7 @@
+name = Image
+description = Provides image manipulation tools.
+package = Core
+version = BACKDROP_VERSION
+backdrop = 1.x
+dependencies[] = file
+configure = admin/config/media/image-styles

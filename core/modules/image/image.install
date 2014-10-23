@@ -1,0 +1,239 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the image module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function image_install() {
+  // Create the styles directory and ensure it's writable.
+  $directory = file_default_scheme() . '://styles';
+  file_prepare_directory($directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function image_uninstall() {
+  // Remove the styles directory and generated images.
+  file_unmanaged_delete_recursive(file_default_scheme() . '://styles');
+}
+
+/**
+ * Implements hook_field_schema().
+ */
+function image_field_schema($field) {
+  return array(
+    'columns' => array(
+      'fid' => array(
+        'description' => 'The {file_managed}.fid being referenced in this field.',
+        'type' => 'int',
+        'not null' => FALSE,
+        'unsigned' => TRUE,
+      ),
+      'alt' => array(
+        'description' => "Alternative image text, for the image's 'alt' attribute.",
+        'type' => 'varchar',
+        'length' => 512,
+        'not null' => FALSE,
+      ),
+      'title' => array(
+        'description' => "Image title text, for the image's 'title' attribute.",
+        'type' => 'varchar',
+        'length' => 1024,
+        'not null' => FALSE,
+      ),
+      'width' => array(
+        'description' => 'The width of the image in pixels.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+      ),
+      'height' => array(
+        'description' => 'The height of the image in pixels.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+      ),
+    ),
+    'indexes' => array(
+      'fid' => array('fid'),
+    ),
+    'foreign keys' => array(
+      'fid' => array(
+        'table' => 'file_managed',
+        'columns' => array('fid' => 'fid'),
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_requirements() to check the PHP GD Library.
+ *
+ * @param $phase
+ */
+function image_requirements($phase) {
+  $requirements = array();
+
+  if ($phase == 'runtime') {
+    // Check for the PHP GD library.
+    if (function_exists('imagegd2')) {
+      $info = gd_info();
+      $requirements['image_gd'] = array(
+        'value' => $info['GD Version'],
+      );
+
+      // Check for filter and rotate support.
+      if (function_exists('imagefilter') && function_exists('imagerotate')) {
+        $requirements['image_gd']['severity'] = REQUIREMENT_OK;
+      }
+      else {
+        $requirements['image_gd']['severity'] = REQUIREMENT_WARNING;
+        $requirements['image_gd']['description'] = t('The GD Library for PHP is enabled, but was compiled without support for functions used by the rotate and desaturate effects. It was probably compiled using the official GD libraries from http://www.libgd.org instead of the GD library bundled with PHP. You should recompile PHP --with-gd using the bundled GD library. See <a href="http://www.php.net/manual/book.image.php">the PHP manual</a>.');
+      }
+    }
+    else {
+      $requirements['image_gd'] = array(
+        'value' => t('Not installed'),
+        'severity' => REQUIREMENT_ERROR,
+        'description' => t('The GD library for PHP is missing or outdated. Check the <a href="@url">PHP image documentation</a> for information on how to correct this.', array('@url' => 'http://www.php.net/manual/book.image.php')),
+      );
+    }
+    $requirements['image_gd']['title'] = t('GD library rotate and desaturate effects');
+  }
+
+  return $requirements;
+}
+
+/**
+ * @addtogroup updates-7.x-to-1.x
+ * @{
+ */
+
+/**
+ * Provide default image styles for the Image module.
+ */
+function image_update_1000() {
+  $data = array(
+    'overridden' => FALSE,
+    'module' => 'image',
+    'label' => 'Thumbnail (100x100)',
+    'name' => 'thumbnail',
+    'effects' => array(
+      'name' => 'image_scale',
+      'data' => array(
+        'width' => 100,
+        'height' => 100,
+        'upscale' => 1,
+      ),
+      'weight' => 1,
+    ),
+  );
+  $config = config('image.styles.thumbnail');
+  $config->setData($data);
+  $config->save();
+
+  $data = array(
+    'overridden' => FALSE,
+    'module' => 'image',
+    'label' => 'Medium (220x220)',
+    'name' => 'medium',
+    'effects' => array(
+      'name' => 'image_scale',
+      'data' => array(
+        'width' => 220,
+        'height' => 220,
+        'upscale' => 1,
+      ),
+      'weight' => 1,
+    ),
+  );
+  $config = config('image.styles.medium');
+  $config->setData($data);
+  $config->save();
+
+  $data = array(
+    'overridden' => FALSE,
+    'module' => 'image',
+    'label' => 'Large (480x480)',
+    'name' => 'large',
+    'effects' => array(
+      'name' => 'image_scale',
+      'data' => array(
+        'width' => 480,
+        'height' => 480,
+        'upscale' => 1,
+      ),
+      'weight' => 1,
+    ),
+  );
+  $config = config('image.styles.large');
+  $config->setData($data);
+  $config->save();
+}
+
+/**
+ * Convert available database image styles to configuration files.
+ */
+function image_update_1001() {
+  if (db_table_exists('image_styles')) {
+    $styles = db_query("SELECT * FROM {image_styles}");
+    $style = NULL;
+    foreach ($styles as $style) {
+      $style = (array) $style;
+      $style['effects'] = array();
+      if (!isset($style['label'])) {
+        $style['label'] = $style['name'];
+      }
+      $effects = db_query("SELECT * FROM {image_effects} WHERE isid = :isid ORDER BY weight ASC, ieid ASC", array(':isid' => $style['isid']));
+      foreach ($effects as $effect) {
+        $effect = (array) $effect;
+        $effect['data'] = unserialize($effect['data']);
+        unset($effect['isid']);
+        unset($effect['ieid']);
+        $style['effects'][] = $effect;
+      }
+      unset($style['isid']);
+      $config = config('image.styles.' . $style['name']);
+      $config->setData($style);
+      $config->save();
+    }
+  }
+}
+
+/**
+ * Drop image tables that were converted to configuration files.
+ *
+ * This update is separate from image_update_1001 so that other modules may read
+ * the image style tables before they are dropped using
+ * hook_update_dependencies() to come between these two updates.
+ */
+function image_update_1002() {
+  if (db_table_exists('image_styles')) {
+    db_drop_table('image_styles');
+    db_drop_table('image_effects');
+  }
+}
+
+/**
+ * Add labels to all available styles.
+ */
+function image_update_1003() {
+  $names = config_get_names_with_prefix('image.styles.');
+  foreach ($names as $config_file) {
+    $config = config($config_file);
+    $label = $config->get('label');
+    if (!$label) {
+      $config->set('label', $config->get('name'));
+      $config->save();
+    }
+  }
+  cache('cache')->delete('image_styles');
+}
+
+/**
+ * @} End of "addtogroup updates-7.x-to-1.x"
+ * The next series of updates should start at 2000.
+ */

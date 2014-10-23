@@ -1,0 +1,96 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the menu module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function menu_schema() {
+  $schema['menu_custom'] = array(
+    'description' => 'Holds definitions for top-level custom menus (for example, Main menu).',
+    'fields' => array(
+      'menu_name' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'Primary Key: Unique key for menu. This is used as a block delta so length is 32.',
+      ),
+      'title' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'Menu title; displayed at top of block.',
+        'translatable' => TRUE,
+      ),
+      'description' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'description' => 'Menu description.',
+        'translatable' => TRUE,
+      ),
+    ),
+    'primary key' => array('menu_name'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function menu_install() {
+  $system_menus = menu_list_system_menus();
+  $t = get_t();
+  $descriptions = array(
+    'main-menu' => $t('The <em>Main</em> menu is used on many sites to show the major sections of the site, often in a top navigation bar.'),
+    'management' => $t('The <em>Management</em> menu contains links for administrative tasks.'),
+    'user-menu' => $t("The <em>User</em> menu contains links related to the user's account, as well as the 'Log out' link."),
+  );
+  foreach ($system_menus as $menu_name => $title) {
+    $menu = array(
+      'menu_name' => $menu_name,
+      'title' => $t($title),
+      'description' => $descriptions[$menu_name],
+    );
+    menu_save($menu);
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function menu_uninstall() {
+  menu_rebuild();
+}
+
+/**
+ * @addtogroup updates-7.x-to-1.x
+ * @{
+ */
+
+/**
+ * Moves menu settings from variables to config.
+ *
+ * @ingroup config_upgrade
+ */
+function menu_update_1000() {
+  // Migrate variables to config.
+  $config = config('menu.settings');
+  $config->set('menu_main_links', variable_get('menu_main_links_source', 'main-menu'));
+  $config->set('menu_secondary_links_source', variable_get('menu_main_links_source', 'user-menu'));
+  $config->save();
+
+  // Delete variables.
+  variable_del('menu_main_links_source');
+  variable_del('menu_secondary_links_source');
+}
+
+/**
+ * @} End of "addtogroup updates-7.x-to-1.x"
+ * The next series of updates should start at 2000.
+ */
