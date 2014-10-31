@@ -528,19 +528,20 @@ $settings['backdrop_drupal_compatibility'] = TRUE;
  * Pantheon specific compatibility.
  *
  * Add the CMI Directory Information directly in settings.php to make sure
- * Backdrop knows all about that.
+ * Backdrop knows all about that. This information is conditionally changed 
+ * during installation to make that process go smoother. 
  */
 if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
   if ($_SERVER['SCRIPT_NAME'] == '/core/install.php') {
     $config_directories = array(
-      'active' => 'sites/default/files/config/active',
-      'staging' => 'sites/default/files/config',
+      'active' => 'sites/default/files/config_' . $drupal_hash_salt . '/active',
+      'staging' => 'config/staging',
     );
   }
   else {
     $config_directories = array(
-      'active' => 'sites/default/config/active',
-      'staging' => 'sites/default/config',
+      'active' => 'sites/default/files/config_' . $drupal_hash_salt . '/active',
+      'staging' => 'config/staging',
     );
   }
 }
@@ -591,5 +592,5 @@ if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
  * Handle Hash Salt Value for Backdrop.
  */
 if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
-  $settings['hash_salt'] = hash('sha256', serialize($databases));
+  $settings['hash_salt'] = $drupal_hash_salt; // Apologies for the $drupal variable
 }
