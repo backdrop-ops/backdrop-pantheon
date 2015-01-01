@@ -48,6 +48,11 @@ const BACKDROP_REQUIRED = 2;
 const BACKDROP_WEIGHT_SELECT_MAX = 100;
 
 /**
+ * Maximum length of e-mail fields.
+ */
+const EMAIL_MAX_LENGTH = 254;
+
+/**
  * Implements hook_theme().
  */
 function system_theme() {
@@ -99,7 +104,7 @@ function system_theme() {
     ),
     'block__system__main' => array(
       'template' => 'templates/block--system--main',
-      //'variables' => array('content' => NULL, 'layout' => NULL, 'block' => NULL, 'style' => NULL, 'settings' => array(), 'attributes_array' => array()),
+      //'variables' => array('content' => NULL, 'layout' => NULL, 'block' => NULL, 'style' => NULL, 'settings' => array(), 'attributes' => array()),
       'base hook' => 'block',
     ),
   ));
@@ -124,9 +129,6 @@ function system_permission() {
       'title' => t('Administer software updates'),
       'restrict access' => TRUE,
     ),
-    'administer actions' => array(
-      'title' => t('Administer actions'),
-    ),
     'access administration pages' => array(
       'title' => t('Use the administration pages'),
     ),
@@ -135,7 +137,7 @@ function system_permission() {
     ),
     'view the administration theme' => array(
       'title' => t('View the administration theme'),
-      'description' => variable_get('admin_theme') ? '' : t('This is only used when the site is configured to use a separate administration theme on the <a href="@appearance-url">Appearance</a> page.', array('@appearance-url' => url('admin/appearance'))),
+      'description' => config_get('system.core', 'admin_theme') ? '' : t('This is only used when the site is configured to use a separate administration theme on the <a href="@appearance-url">Appearance</a> page.', array('@appearance-url' => url('admin/appearance'))),
     ),
     'access site reports' => array(
       'title' => t('View site reports'),
@@ -869,44 +871,6 @@ function system_menu() {
     'access arguments' => array('access administration pages'),
     'file' => 'system.admin.inc',
   );
-  $items['admin/config/system/actions'] = array(
-    'title' => 'Actions',
-    'description' => 'Manage the actions defined for your site.',
-    'access arguments' => array('administer actions'),
-    'page callback' => 'system_actions_manage',
-    'file' => 'system.admin.inc',
-  );
-  $items['admin/config/system/actions/manage'] = array(
-    'title' => 'Manage actions',
-    'description' => 'Manage the actions defined for your site.',
-    'page callback' => 'system_actions_manage',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-    'weight' => -2,
-    'file' => 'system.admin.inc',
-  );
-  $items['admin/config/system/actions/configure'] = array(
-    'title' => 'Configure an advanced action',
-    'page callback' => 'backdrop_get_form',
-    'page arguments' => array('system_actions_configure'),
-    'access arguments' => array('administer actions'),
-    'type' => MENU_VISIBLE_IN_BREADCRUMB,
-    'file' => 'system.admin.inc',
-  );
-  $items['admin/config/system/actions/delete/%actions'] = array(
-    'title' => 'Delete action',
-    'description' => 'Delete an action.',
-    'page callback' => 'backdrop_get_form',
-    'page arguments' => array('system_actions_delete_form', 5),
-    'access arguments' => array('administer actions'),
-    'file' => 'system.admin.inc',
-  );
-  $items['admin/config/system/actions/orphan'] = array(
-    'title' => 'Remove orphans',
-    'page callback' => 'system_actions_remove_orphans',
-    'access arguments' => array('administer actions'),
-    'type' => MENU_CALLBACK,
-    'file' => 'system.admin.inc',
-  );
   $items['admin/config/system/site-information'] = array(
     'title' => 'Site information',
     'description' => 'Change site name, logo, favicon, slogan, e-mail address, default front page, and number of posts per page, error pages.',
@@ -1385,9 +1349,13 @@ function system_library_info() {
     'js' => array(
       'core/misc/ui/jquery.ui.draggable.min.js' => array(),
     ),
+    'css' => array(
+      'core/misc/ui/jquery.ui.draggable.css' => array(),
+    ),
     'dependencies' => array(
       array('system', 'ui.widget'),
       array('system', 'ui.mouse'),
+      array('system', 'ui.touch-punch'),
     ),
   );
   $libraries['ui.droppable'] = array(
@@ -1481,6 +1449,23 @@ function system_library_info() {
       array('system', 'ui.mouse'),
     ),
   );
+
+  $libraries['ui.selectmenu'] = array(
+    'title' => 'jQuery UI: Select Menu',
+    'website' => 'http://jqueryui.com/selectmenu/',
+    'version' => $libraries['ui']['version'],
+    'js' => array(
+      'core/misc/ui/jquery.ui.selectmenu.min.js' => array(),
+    ),
+    'css' => array(
+      'core/misc/ui/jquery.ui.selectmenu.css' => array(),
+    ),
+    'dependencies' => array(
+      array('system', 'ui.widget'),
+      array('system', 'ui.position'),
+      array('system', 'ui.menu'),
+    ),
+  );
   $libraries['ui.slider'] = array(
     'title' => 'jQuery UI: Slider',
     'website' => 'http://jqueryui.com/slider/',
@@ -1503,9 +1488,12 @@ function system_library_info() {
     'js' => array(
       'core/misc/ui/jquery.ui.sortable.min.js' => array(),
     ),
+    'css' => array(
+      'core/misc/ui/jquery.ui.sortable.css' => array(),
+    ),
     'dependencies' => array(
-      array('system', 'ui.widget'),
-      array('system', 'ui.mouse'),
+      array('system', 'ui.draggable'),
+      array('system', 'ui.droppable'),
     ),
   );
   $libraries['ui.spinner'] = array(
@@ -1644,6 +1632,17 @@ function system_library_info() {
       array('system', 'effects'),
     ),
   );
+  $libraries['effects.puff'] = array(
+    'title' => 'jQuery UI: Effects Puff',
+    'website' => 'http://jqueryui.com/effect/',
+    'version' => $libraries['ui']['version'],
+    'js' => array(
+      'core/misc/ui/jquery.ui.effect-puff.min.js' => array(),
+    ),
+    'dependencies' => array(
+      array('system', 'effects'),
+    ),
+  );
   $libraries['effects.pulsate'] = array(
     'title' => 'jQuery UI: Effects Pulsate',
     'website' => 'http://jqueryui.com/effect/',
@@ -1677,6 +1676,17 @@ function system_library_info() {
       array('system', 'effects'),
     ),
   );
+  $libraries['effects.scale'] = array(
+    'title' => 'jQuery UI: Effects Scale',
+    'website' => 'http://jqueryui.com/effect/',
+    'version' => $libraries['ui']['version'],
+    'js' => array(
+      'core/misc/ui/jquery.ui.effect-scale.min.js' => array(),
+    ),
+    'dependencies' => array(
+      array('system', 'effects'),
+    ),
+  );
   $libraries['effects.slide'] = array(
     'title' => 'jQuery UI: Effects Slide',
     'website' => 'http://jqueryui.com/effect/',
@@ -1697,6 +1707,20 @@ function system_library_info() {
     ),
     'dependencies' => array(
       array('system', 'effects'),
+    ),
+  );
+
+  // Touch Punch for jQuery UI touch support.
+  $libraries['ui.touch-punch'] = array(
+    'title' => 'jQuery UI Touch Punch',
+    'website' => 'http://touchpunch.furf.com/',
+    'version' => '0.2.3',
+    'js' => array(
+      'core/misc/jquery.ui.touch-punch.js' => array(),
+    ),
+    'dependencies' => array(
+      array('system', 'ui.widget'),
+      array('system', 'ui.mouse'),
     ),
   );
 
@@ -1723,7 +1747,7 @@ function system_stream_wrappers() {
   );
 
   // Only register the private file stream wrapper if a file path has been set.
-  if (variable_get('file_private_path', FALSE)) {
+  if (config_get('system.core', 'file_private_path')) {
     $wrappers['private'] = array(
       'name' => t('Private files'),
       'class' => 'BackdropPrivateStreamWrapper',
@@ -2002,7 +2026,7 @@ function system_add_module_assets() {
  */
 function system_custom_theme() {
   if (user_access('view the administration theme') && path_is_admin(current_path())) {
-    return variable_get('admin_theme');
+    return config_get('system.core', 'admin_theme');
   }
 }
 
@@ -2169,14 +2193,14 @@ function system_preprocess_block(&$variables) {
 
     switch ($variables['block']->delta) {
       case 'powered-by':
-        $variables['attributes_array']['role'] = 'complementary';
+        $variables['attributes']['role'] = 'complementary';
         break;
 
       // System menu blocks should get the same class as menu module blocks.
       default:
         if (in_array($variables['block']->delta, array_keys(menu_list_system_menus()))) {
-          $variables['attributes_array']['role'] = 'navigation';
-          $variables['classes_array'][] = 'block-menu';
+          $variables['attributes']['role'] = 'navigation';
+          $variables['classes'][] = 'block-menu';
         }
     }
   }
@@ -2592,7 +2616,6 @@ function _system_rebuild_theme_data() {
       'header' => 'Header',
       'footer' => 'Footer',
       'highlighted' => 'Highlighted',
-      'page_top' => 'Page top',
       'page_bottom' => 'Page bottom',
     ),
     'description' => '',
@@ -2778,64 +2801,6 @@ function system_header_block($settings) {
   $variables['menu']        = $menu ? theme('links__header_menu', array('links' => $menu)) : NULL;
 
   return theme('header', $variables);
-}
-
-/**
- * Sets up a form to save information automatically.
- *
- * This function adds a submit handler and a submit button to a form array. The
- * submit function saves all the data in the form, using variable_set(), to
- * variables named the same as the keys in the form array. Note that this means
- * you should normally prefix your form array keys with your module name, so
- * that they are unique when passed into variable_set().
- *
- * If you need to manipulate the data in a custom manner, you can either put
- * your own submission handler in the form array before calling this function,
- * or just use your own submission handler instead of calling this function.
- *
- * @param $form
- *   An associative array containing the structure of the form.
- *
- * @return
- *   The form structure.
- *
- * @see system_settings_form_submit()
- *
- * @ingroup forms
- */
-function system_settings_form($form) {
-  $form['actions']['#type'] = 'actions';
-  $form['actions']['submit'] = array('#type' => 'submit', '#value' => t('Save configuration'));
-
-  if (!empty($_POST) && form_get_errors()) {
-    backdrop_set_message(t('The settings have not been saved because of the errors.'), 'error');
-  }
-  $form['#submit'][] = 'system_settings_form_submit';
-  // By default, render the form using theme_system_settings_form().
-  if (!isset($form['#theme'])) {
-    $form['#theme'] = 'system_settings_form';
-  }
-  return $form;
-}
-
-/**
- * Form submission handler for system_settings_form().
- *
- * If you want node type configure style handling of your checkboxes,
- * add an array_filter value to your form.
- */
-function system_settings_form_submit($form, &$form_state) {
-  // Exclude unnecessary elements.
-  form_state_values_clean($form_state);
-
-  foreach ($form_state['values'] as $key => $value) {
-    if (is_array($value) && isset($form_state['values']['array_filter'])) {
-      $value = array_keys(array_filter($value));
-    }
-    variable_set($key, $value);
-  }
-
-  backdrop_set_message(t('The configuration options have been saved.'));
 }
 
 /**
@@ -3201,10 +3166,11 @@ function system_cron() {
     }
   }
 
+  // Remove expired and temporary items from cache bins.
   $core = array('cache', 'path', 'filter', 'page', 'menu');
   $cache_bins = array_merge(module_invoke_all('flush_caches'), $core);
   foreach ($cache_bins as $bin) {
-    cache($bin)->expire();
+    cache($bin)->garbageCollection();
   }
 
   // Cleanup the batch table and the queue for failed batches.
@@ -3236,155 +3202,6 @@ function system_flush_caches() {
 }
 
 /**
- * Implements hook_action_info().
- */
-function system_action_info() {
-  return array(
-    'system_message_action' => array(
-      'type' => 'system',
-      'label' => t('Display a message to the user'),
-      'configurable' => TRUE,
-    ),
-    'system_send_email_action' => array(
-      'type' => 'system',
-      'label' => t('Send e-mail'),
-      'configurable' => TRUE,
-    ),
-    'system_block_ip_action' => array(
-      'type' => 'user',
-      'label' => t('Ban IP address of current user'),
-      'configurable' => FALSE,
-    ),
-    'system_goto_action' => array(
-      'type' => 'system',
-      'label' => t('Redirect to URL'),
-      'configurable' => TRUE,
-    ),
-  );
-}
-
-/**
- * Return a form definition so the Send email action can be configured.
- *
- * @param $context
- *   Default values (if we are editing an existing action instance).
- *
- * @return
- *   Form definition.
- *
- * @see system_send_email_action_validate()
- * @see system_send_email_action_submit()
- */
-function system_send_email_action_form($context) {
-  // Set default values for form.
-  if (!isset($context['recipient'])) {
-    $context['recipient'] = '';
-  }
-  if (!isset($context['subject'])) {
-    $context['subject'] = '';
-  }
-  if (!isset($context['message'])) {
-    $context['message'] = '';
-  }
-
-  $form['recipient'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Recipient'),
-    '#default_value' => $context['recipient'],
-    '#maxlength' => '254',
-    '#description' => t('The e-mail address to which the message should be sent OR enter [node:author:mail], [comment:author:mail], etc. if you would like to send an e-mail to the author of the original post.'),
-  );
-  $form['subject'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Subject'),
-    '#default_value' => $context['subject'],
-    '#maxlength' => '254',
-    '#description' => t('The subject of the message.'),
-  );
-  $form['message'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Message'),
-    '#default_value' => $context['message'],
-    '#cols' => '80',
-    '#rows' => '20',
-    '#description' => t('The message that should be sent. You may include placeholders like [node:title], [user:name], and [comment:body] to represent data that will be different each time message is sent. Not all placeholders will be available in all contexts.'),
-  );
-  return $form;
-}
-
-/**
- * Validate system_send_email_action form submissions.
- */
-function system_send_email_action_validate($form, $form_state) {
-  $form_values = $form_state['values'];
-  // Validate the configuration form.
-  if (!valid_email_address($form_values['recipient']) && strpos($form_values['recipient'], ':mail') === FALSE) {
-    // We want the literal %author placeholder to be emphasized in the error message.
-    form_set_error('recipient', t('Enter a valid email address or use a token e-mail address such as %author.', array('%author' => '[node:author:mail]')));
-  }
-}
-
-/**
- * Process system_send_email_action form submissions.
- */
-function system_send_email_action_submit($form, $form_state) {
-  $form_values = $form_state['values'];
-  // Process the HTML form to store configuration. The keyed array that
-  // we return will be serialized to the database.
-  $params = array(
-    'recipient' => $form_values['recipient'],
-    'subject'   => $form_values['subject'],
-    'message'   => $form_values['message'],
-  );
-  return $params;
-}
-
-/**
- * Sends an e-mail message.
- *
- * @param object $entity
- *   An optional node entity, which will be added as $context['node'] if
- *   provided.
- * @param array $context
- *   Array with the following elements:
- *   - 'recipient': E-mail message recipient. This will be passed through
- *     token_replace().
- *   - 'subject': The subject of the message. This will be passed through
- *     token_replace().
- *   - 'message': The message to send. This will be passed through
- *     token_replace().
- *   - Other elements will be used as the data for token replacement.
- *
- * @ingroup actions
- */
-function system_send_email_action($entity, $context) {
-  if (empty($context['node'])) {
-    $context['node'] = $entity;
-  }
-
-  $recipient = token_replace($context['recipient'], $context);
-
-  // If the recipient is a registered user with a language preference, use
-  // the recipient's preferred language. Otherwise, use the system default
-  // language.
-  $recipient_account = user_load_by_mail($recipient);
-  if ($recipient_account) {
-    $language = user_preferred_language($recipient_account);
-  }
-  else {
-    $language = language_default();
-  }
-  $params = array('context' => $context);
-
-  if (backdrop_mail('system', 'action_send_email', $recipient, $language, $params)) {
-    watchdog('action', 'Sent email to %recipient', array('%recipient' => $recipient));
-  }
-  else {
-    watchdog('error', 'Unable to send email to %recipient', array('%recipient' => $recipient));
-  }
-}
-
-/**
  * Implements hook_mail().
  */
 function system_mail($key, &$message, $params) {
@@ -3395,83 +3212,6 @@ function system_mail($key, &$message, $params) {
 
   $message['subject'] .= str_replace(array("\r", "\n"), '', $subject);
   $message['body'][] = $body;
-}
-
-function system_message_action_form($context) {
-  $form['message'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Message'),
-    '#default_value' => isset($context['message']) ? $context['message'] : '',
-    '#required' => TRUE,
-    '#rows' => '8',
-    '#description' => t('The message to be displayed to the current user. You may include placeholders like [node:title], [user:name], and [comment:body] to represent data that will be different each time message is sent. Not all placeholders will be available in all contexts.'),
-  );
-  return $form;
-}
-
-function system_message_action_submit($form, $form_state) {
-  return array('message' => $form_state['values']['message']);
-}
-
-/**
- * Sends a message to the current user's screen.
- *
- * @param object $entity
- *   An optional node entity, which will be added as $context['node'] if
- *   provided.
- * @param array $context
- *   Array with the following elements:
- *   - 'message': The message to send. This will be passed through
- *     token_replace().
- *   - Other elements will be used as the data for token replacement in
- *     the message.
- *
- * @ingroup actions
- */
-function system_message_action(&$entity, $context = array()) {
-  if (empty($context['node'])) {
-    $context['node'] = $entity;
-  }
-
-  $context['message'] = token_replace(filter_xss_admin($context['message']), $context);
-  backdrop_set_message($context['message']);
-}
-
-/**
- * Settings form for system_goto_action().
- */
-function system_goto_action_form($context) {
-  $form['url'] = array(
-    '#type' => 'textfield',
-    '#title' => t('URL'),
-    '#description' => t('The URL to which the user should be redirected. This can be an internal URL like node/1234 or an external URL like http://backdropcms.org.'),
-    '#default_value' => isset($context['url']) ? $context['url'] : '',
-    '#required' => TRUE,
-  );
-  return $form;
-}
-
-function system_goto_action_submit($form, $form_state) {
-  return array(
-    'url' => $form_state['values']['url']
-  );
-}
-
-/**
- * Redirects to a different URL.
- *
- * @param $entity
- *   Ignored.
- * @param array $context
- *   Array with the following elements:
- *   - 'url': URL to redirect to. This will be passed through
- *     token_replace().
- *   - Other elements will be used as the data for token replacement.
- *
- * @ingroup actions
- */
-function system_goto_action($entity, $context) {
-  backdrop_goto(token_replace($context['url'], $context));
 }
 
 /**
@@ -3512,7 +3252,7 @@ function system_check_http_request() {
   // We only care that we get a http response - this means that Backdrop
   // can make a http request.
   $works = isset($result->code) && ($result->code >= 100) && ($result->code < 600);
-  variable_set('backdrop_http_request_fails', !$works);
+  state_set('backdrop_http_request_fails', !$works);
   return $works;
 }
 
@@ -3789,16 +3529,16 @@ function system_config_info() {
     'label' => t('System core settings'),
     'group' => t('Configuration'),
   );
-  $prefixes['system.action'] = array(
-    'label' => t('System action'),
-    'group' => t('Configuration'),
-  );
   $prefixes['system.authorize'] = array(
     'label' => t('System authorize'),
     'group' => t('Configuration'),
   );
   $prefixes['system.date'] = array(
     'label' => t('System date'),
+    'group' => t('Configuration'),
+  );
+  $prefixes['system.mail'] = array(
+    'label' => t('Mail systems'),
     'group' => t('Configuration'),
   );
   return $prefixes;

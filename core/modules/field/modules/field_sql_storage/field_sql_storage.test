@@ -323,51 +323,6 @@ class FieldSqlStorageTestCase extends BackdropWebTestCase {
   }
 
   /**
-   * Test adding and removing indexes while data is present.
-   */
-  function testFieldUpdateIndexesWithData() {
-
-    // Create a decimal field.
-    $field_name = 'testfield';
-    $field = array('field_name' => $field_name, 'type' => 'text');
-    $field = field_create_field($field);
-    $instance = array('field_name' => $field_name, 'entity_type' => 'test_entity', 'bundle' => 'test_bundle');
-    $instance = field_create_instance($instance);
-    $tables = array(_field_sql_storage_tablename($field), _field_sql_storage_revision_tablename($field));
-
-    // Verify the indexes we will create do not exist yet.
-    foreach ($tables as $table) {
-      $this->assertFalse(Database::getConnection()->schema()->indexExists($table, 'value'), format_string("No index named value exists in %table", array('%table' => $table)));
-      $this->assertFalse(Database::getConnection()->schema()->indexExists($table, 'value_format'), format_string("No index named value_format exists in %table", array('%table' => $table)));
-    }
-
-    // Add data so the table cannot be dropped.
-    $entity = field_test_create_stub_entity(0, 0, $instance['bundle']);
-    $entity->{$field_name}[LANGUAGE_NONE][0]['value'] = 'field data';
-    field_attach_insert('test_entity', $entity);
-
-    // Add an index
-    $field = array('field_name' => $field_name, 'indexes' => array('value' => array('value')));
-    field_update_field($field);
-    foreach ($tables as $table) {
-      $this->assertTrue(Database::getConnection()->schema()->indexExists($table, "{$field_name}_value"), format_string("Index on value created in %table", array('%table' => $table)));
-    }
-
-    // Add a different index, removing the existing custom one.
-    $field = array('field_name' => $field_name, 'indexes' => array('value_format' => array('value', 'format')));
-    field_update_field($field);
-    foreach ($tables as $table) {
-      $this->assertTrue(Database::getConnection()->schema()->indexExists($table, "{$field_name}_value_format"), format_string("Index on value_format created in %table", array('%table' => $table)));
-      $this->assertFalse(Database::getConnection()->schema()->indexExists($table, "{$field_name}_value"), format_string("Index on value removed in %table", array('%table' => $table)));
-    }
-
-    // Verify that the tables were not dropped.
-    $entity = field_test_create_stub_entity(0, 0, $instance['bundle']);
-    field_attach_load('test_entity', array(0 => $entity));
-    $this->assertEqual($entity->{$field_name}[LANGUAGE_NONE][0]['value'], 'field data', "Index changes performed without dropping the tables");
-  }
-
-  /**
    * Test the storage details.
    */
   function testFieldStorageDetails() {
@@ -401,19 +356,26 @@ class FieldSqlStorageTestCase extends BackdropWebTestCase {
   function testFieldSqlStorageForeignKeys() {
     // Create a decimal field.
     $field_name = 'testfield';
-    $field = array('field_name' => $field_name, 'type' => 'text');
+    $field = array(
+      'field_name' => $field_name,
+      'type' => 'shape',
+      'settings' => array(
+        'foreign_key_name' => 'foo',
+      ),
+    );
+
     $field = field_create_field($field);
     // Retrieve the field and instance with field_info and verify the foreign
     // keys are in place.
     $field = field_info_field($field_name);
-    $this->assertEqual($field['foreign keys']['format']['table'], 'filter_format', 'Foreign key table name preserved through CRUD');
-    $this->assertEqual($field['foreign keys']['format']['columns']['format'], 'format', 'Foreign key column name preserved through CRUD');
+    $this->assertEqual($field['foreign keys']['foo']['table'], 'foo', 'Foreign key table name preserved through CRUD');
+    $this->assertEqual($field['foreign keys']['foo']['columns']['foo'], 'id', 'Foreign key column name preserved through CRUD');
     // Now grab the SQL schema and verify that too.
     $schema = backdrop_get_schema(_field_sql_storage_tablename($field));
     $this->assertEqual(count($schema['foreign keys']), 1, 'There is 1 foreign key in the schema');
     $foreign_key = reset($schema['foreign keys']);
-    $filter_column = _field_sql_storage_columnname($field['field_name'], 'format');
-    $this->assertEqual($foreign_key['table'], 'filter_format', 'Foreign key table name preserved in the schema');
-    $this->assertEqual($foreign_key['columns'][$filter_column], 'format', 'Foreign key column name preserved in the schema');
+    $id_column = _field_sql_storage_columnname($field['field_name'], 'foo');
+    $this->assertEqual($foreign_key['table'], 'foo', 'Foreign key table name preserved in the schema');
+    $this->assertEqual($foreign_key['columns'][$id_column], 'id', 'Foreign key column name preserved in the schema');
   }
 }

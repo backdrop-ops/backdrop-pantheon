@@ -25,9 +25,7 @@ function config_sync_batch($config_statuses = NULL) {
  * Batch API callback. Start the config import.
  */
 function _config_sync_start($config_statuses, &$context) {
-  // @todo: Switch to a proper state system, since variables should be
-  // deprecated by the configuration system.
-  variable_set('config_sync', REQUEST_TIME);
+  state_set('config_sync', REQUEST_TIME);
 
   // The complete list of changes are stored in the results array. This makes
   // these values available in all subsequent batch callbacks.
@@ -41,7 +39,7 @@ function _config_sync_start($config_statuses, &$context) {
  */
 function _config_sync_validate(&$context) {
   if (!isset($context['sandbox']['batch_size'])) {
-    $context['sandbox']['batch_size'] = variable_get('config_sync_batch_size', 50);
+    $context['sandbox']['batch_size'] = config_get('system.core', 'config_sync_batch_size');
     $context['sandbox']['total_size'] = count($context['results']['pending_changes']);
     $context['sandbox']['current_index'] = 0;
   }
@@ -73,12 +71,12 @@ function _config_sync_import(&$context) {
   }
 
   if (!isset($context['sandbox']['batch_size'])) {
-    $context['sandbox']['batch_size'] = variable_get('config_sync_batch_size', 50);
+    $context['sandbox']['batch_size'] = config_get('system.core', 'config_sync_batch_size');
     $context['sandbox']['total_size'] = count($context['results']['pending_changes']);
     $context['sandbox']['current_index'] = 0;
   }
 
-  $config_files = array_slice($context['results']['pending_changes'], $context['sandbox']['current_index'], $context['sandbox']['batch_size']);
+  $config_files = array_slice($context['results']['pending_changes'], 0, $context['sandbox']['batch_size']);
   foreach ($config_files as $config_file => $config_change_type) {
     config_sync_file($config_file, $config_change_type);
     unset($context['results']['pending_changes'][$config_file]);
@@ -107,7 +105,9 @@ function _config_sync_finished($status, $results, &$context) {
     $config_storage = new ConfigFileStorage($config_dir);
     $config_storage->deleteAll();
   }
-  variable_del('config_sync');
+
+  backdrop_flush_all_caches();
+  state_del('config_sync');
 }
 
 /**
@@ -117,7 +117,7 @@ function _config_sync_finished($status, $results, &$context) {
  * configuration changes. If any module encounters a validation problem, it
  * should throw a ConfigValidateException exception.
  *
- * @param string $config_file
+ * @param string $config_name
  *   The name of the config file being synced.
  * @param string $config_change_type
  *   The type of change occurring to this config file. Must be one of the
@@ -138,16 +138,31 @@ function _config_sync_finished($status, $results, &$context) {
  * @see hook_config_update_validate().
  * @see hook_config_delete_validate().
  */
-function config_sync_validate_file($config_file, $config_change_type, $all_changes = NULL, $config_data = NULL) {
+function config_sync_validate_file($config_name, $config_change_type, $all_changes = NULL, $config_data = NULL) {
   // Read the config data from staging if contents are not provided.
   if (is_null($config_data)) {
-    $staging_config = config($config_file, 'staging')->load();
+    $staging_config = config($config_name, 'staging')->load();
   }
   // If contents are provided, create a staging config object. This object is
   // not actually written to disk, so it should not affect any existing staged
   // configuration files when performing a single import.
   else {
-    $staging_config = config($config_file, 'staging')->setData($config_data);
+    $staging_config = config($config_name, 'staging')->setData($config_data);
+  }
+
+  // First check that a module claims this config file. Unclaimed configs cannot
+  // be managed at all, because hooks may need to be fired when performing any
+  // kind of change (e.g. a deleted config might need to remove database
+  // tables).
+  $config_info = config_get_info($config_name);
+  if (empty($config_info)) {
+    if ($config_change_type === 'delete') {
+      $message = t('The configuration "@name" is not owned by any enabled module, so it cannot be deleted. If you have disabled this module, either <a href="!enable">enable the module</a> and try the import again, or <a href="!uninstall">uninstall the module entirely</a> to clean up left-over configuration.', array('@name' => $config_name, '!enable' => url('admin/modules'), '!uninstall' => url('admin/modules/uninstall')));
+    }
+    else {
+      $message = t('The configuration "@name" is not owned by any module. Try enabling the module that provides this configuration, then importing again.', array('@name' => $config_name));
+    }
+    throw new ConfigValidateException($message);
   }
 
   switch ($config_change_type) {
@@ -157,11 +172,11 @@ function config_sync_validate_file($config_file, $config_change_type, $all_chang
       break;
     case 'update':
       $staging_config->validateData();
-      $active_config = config($config_file, 'active')->load();
+      $active_config = config($config_name, 'active')->load();
       module_invoke_all('config_update_validate', $staging_config, $active_config, $all_changes);
       break;
     case 'delete':
-      $active_config = config($config_file, 'active')->load();
+      $active_config = config($config_name, 'active')->load();
       module_invoke_all('config_delete_validate', $active_config, $all_changes);
       break;
   }
@@ -216,5 +231,4 @@ function config_sync_file($config_file, $config_change_type, $config_contents = 
       $active_config->delete();
       break;
   }
-  backdrop_flush_all_caches();
 }

@@ -14,8 +14,18 @@
  * exporting. Each entry in the returned array should contain at least the
  * following values:
  *   - label: A translated string for the name of the configuration file.
+ *   - name_key: A string or array indicating the entry or entries within the
+ *     configuration file that will be used as the machine name. If specifying
+ *     an array, it should be ordered the same as the name of the configuration
+ *     file. For example if the configuration file is named
+ *     "my_module.feature.key_a.key_b.json", the expected name keys would be
+ *     array('key_a', 'key_b'). In most case when only a single key is needed,
+ *     the name_key can be specified as a simple string.
  *   - label_key: A string indicating the entry within the configuration file
- *       that will be used as a label.
+ *     that will be used as a label.
+ *   - label_callback: Alternatively, if the "label" or "label_key" options are
+ *     not suitable for generating a label, a function may be specified as a
+ *     label callback.
  *   - group: A translated string to be used as the configuration group.
  */
 function hook_config_info() {
@@ -34,6 +44,29 @@ function hook_config_info() {
     'group' => t('Configuration'),
   );
   return $prefixes;
+}
+
+/**
+ * Validate a configuration before saving it.
+ *
+ * If any problems are encountered with the configuration, implementations of
+ * this hook should throw a ConfigValidateException to prevent the configuration
+ * from saving.
+ *
+ * @param Config $config
+ *   The configuration object for the settings about to be saved.
+ * @param array $config_info
+ *   The information about the configuration being imported, as provided by
+ *   hook_config_info().
+ *
+ * @throws ConfigValidateException
+ */
+function hook_config_data_validate(Config $config, array $config_info) {
+  if ($config->getName() === 'mymodule.settings') {
+    if (!module_exists($config->get('module'))) {
+      throw new ConfigValidateException(t('The configuration "@file" could not be imported because the module "@module" is not enabled.', array('@file' => $config->getName(), '@module' => $config->get('module'))));
+    }
+  }
 }
 
 /**

@@ -90,7 +90,7 @@ function system_admin_index() {
     // Only display a section if there are any available tasks.
     if ($admin_tasks = system_get_module_admin_tasks($module, $info->info)) {
       // Sort links by title.
-      uasort($admin_tasks, 'backdrop_sort_title');
+      backdrop_sort($admin_tasks, array('title' => SORT_STRING));
       // Move 'Configure permissions' links to the bottom of each section.
       $permission_key = "admin/config/people/permissions#module-$module";
       if (isset($admin_tasks[$permission_key])) {
@@ -113,8 +113,11 @@ function system_themes_page() {
   $themes = system_rebuild_theme_data();
   uasort($themes, 'system_sort_modules_by_info_name');
 
-  $theme_default = variable_get('theme_default', 'stark');
-  $theme_groups  = array();
+  $theme_default = config_get('system.core', 'theme_default');
+  $theme_groups  = array(
+    'enabled' => array(),
+    'disabled' => array(),
+  );
 
   foreach ($themes as &$theme) {
     if (!empty($theme->info['hidden'])) {
@@ -211,10 +214,10 @@ function system_themes_page() {
 
   // There are two possible theme groups.
   $theme_group_titles = array(
-    'enabled' => format_plural(count($theme_groups['enabled']), 'Enabled theme', 'Enabled themes'),
+    'enabled' => t('Enabled themes'),
   );
   if (!empty($theme_groups['disabled'])) {
-    $theme_group_titles['disabled'] = format_plural(count($theme_groups['disabled']), 'Disabled theme', 'Disabled themes');
+    $theme_group_titles['disabled'] = t('Disabled themes');
   }
 
   uasort($theme_groups['enabled'], 'system_sort_themes');
@@ -241,7 +244,7 @@ function system_themes_admin_form($form, &$form_state, $theme_options) {
     '#options' => array(0 => t('Default theme')) + $theme_options,
     '#title' => t('Administration theme'),
     '#description' => t('Choose "Default theme" to always use the same theme as the rest of the site.'),
-    '#default_value' => variable_get('admin_theme', 0),
+    '#default_value' => config_get('system.core', 'admin_theme'),
   );
   $form['admin_theme']['actions'] = array('#type' => 'actions');
   $form['admin_theme']['actions']['submit'] = array(
@@ -256,7 +259,7 @@ function system_themes_admin_form($form, &$form_state, $theme_options) {
  */
 function system_themes_admin_form_submit($form, &$form_state) {
   backdrop_set_message(t('The configuration options have been saved.'));
-  variable_set('admin_theme', $form_state['values']['admin_theme']);
+  config_set('system.core', 'admin_theme', $form_state['values']['admin_theme']);
 }
 
 /**
@@ -292,7 +295,7 @@ function system_theme_disable() {
 
     // Check if the specified theme is one recognized by the system.
     if (!empty($themes[$theme])) {
-      if ($theme == variable_get('theme_default', 'stark')) {
+      if ($theme == config_get('system.core', 'theme_default')) {
         // Don't disable the default theme.
         backdrop_set_message(t('%theme is the default theme and cannot be disabled.', array('%theme' => $themes[$theme]->info['name'])), 'error');
       }
@@ -325,19 +328,19 @@ function system_theme_default() {
        theme_enable(array($theme));
       }
       // Set the default theme.
-      variable_set('theme_default', $theme);
+      config_set('system.core', 'theme_default', $theme);
 
       // Rebuild the menu. This duplicates the menu_rebuild() in theme_enable().
       // However, modules must know the current default theme in order to use
       // this information in hook_menu() or hook_menu_alter() implementations,
-      // and doing the variable_set() before the theme_enable() could result
+      // and doing the config_set() before the theme_enable() could result
       // in a race condition where the theme is default but not enabled.
       menu_rebuild();
 
       // The status message depends on whether an admin theme is currently in use:
       // a value of 0 means the admin theme is set to be the default theme.
-      $admin_theme = variable_get('admin_theme', 0);
-      if ($admin_theme != 0 && $admin_theme != $theme) {
+      $admin_theme = config_get('system.core', 'admin_theme');
+      if ($admin_theme && $admin_theme != $theme) {
         backdrop_set_message(t('Please note that the administration theme is still set to the %admin_theme theme; consequently, the theme on this page remains unchanged. All non-administrative sections of the site, however, will show the selected %selected_theme theme by default.', array(
           '%admin_theme' => $themes[$admin_theme]->info['name'],
           '%selected_theme' => $themes[$theme]->info['name'],
@@ -533,9 +536,10 @@ function system_modules($form, $form_state = array()) {
   foreach ($visible_files as $filename => $module) {
     $extra = array();
     $extra['enabled'] = (bool) $module->status;
+    $extra['disabled'] = (array_key_exists('disabled', $module->info)) ? $module->info['disabled'] : FALSE;
 
-    // Some modules are always required by core and cannot be disabled, e.g.
-    // node, system, entity.
+    // Some modules are always required by core and cannot be disabled, for
+    // example: entity, node, system, and user.
     $extra['required_by_distribution'] = FALSE;
     if (!empty($module->info['required'] )) {
       $extra['disabled'] = TRUE;
@@ -552,6 +556,7 @@ function system_modules($form, $form_state = array()) {
       // Only display visible modules.
       elseif (isset($visible_files[$requires])) {
         $requires_name = $files[$requires]->info['name'];
+
         // Disable this module if it is incompatible with the dependency's version.
         if ($incompatible_version = backdrop_check_incompatibility($v, str_replace(BACKDROP_CORE_COMPATIBILITY . '-', '', $files[$requires]->info['version']))) {
           $extra['requires'][$requires] = t('@module (<span class="admin-missing">incompatible with</span> version @version)', array(
@@ -560,8 +565,8 @@ function system_modules($form, $form_state = array()) {
           ));
           $extra['disabled'] = TRUE;
         }
-        // Disable this module if the dependency is incompatible with this
-        // version of Backdrop core.
+
+        // Disable this module if the dependency is incompatible with this version of Backdrop core.
         elseif ($files[$requires]->info['backdrop'] != BACKDROP_CORE_COMPATIBILITY) {
           $extra['requires'][$requires] = t('@module (<span class="admin-missing">incompatible with</span> this version of Backdrop core)', array(
             '@module' => $requires_name,
@@ -581,9 +586,9 @@ function system_modules($form, $form_state = array()) {
     if ($module->status && user_access('administer permissions') && in_array($filename, module_implements('permission'))) {
       $extra['links']['permissions'] = array(
         'title' => t('Permissions'),
-        'href' => 'admin/people/permissions',
+        'href' => 'admin/config/people/permissions',
         'attributes' => array('class' => array('module-link', 'module-link-permissions'), 'title' => t('Configure permissions')),
-        'options' => array('fragment' => 'module-' . $filename),
+        'fragment' => 'module-' . $filename,
       );
     }
 
@@ -636,7 +641,7 @@ function system_modules($form, $form_state = array()) {
   }
 
   // Lastly, sort all fieldsets by title.
-  uasort($form['modules'], 'element_sort_by_title');
+  backdrop_sort($form['modules'], array('#title' => SORT_STRING));
 
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
@@ -1092,7 +1097,6 @@ function system_modules_uninstall_submit($form, &$form_state) {
  * Form builder; The general site information form.
  *
  * @ingroup forms
- * @see system_settings_form()
  */
 function system_site_information_settings($form, &$form_state) {
   $site_config = config('system.core');
@@ -1199,11 +1203,11 @@ function system_site_information_settings($form, &$form_state) {
     '#default_value' => ($site_config->get('site_frontpage') != 'user' ? backdrop_get_path_alias($site_config->get('site_frontpage')) : ''),
     '#size' => 40,
     '#description' => t('Optionally, specify a relative URL to display as the front page.  Leave blank to display the default content feed.'),
-    '#field_prefix' => url(NULL, array('absolute' => TRUE)) . (variable_get('clean_url', 0) ? '' : '?q='),
+    '#field_prefix' => url(NULL, array('absolute' => TRUE)) . (config_get('system.core', 'clean_url') ? '' : '?q='),
   );
   $form['front_page']['default_nodes_main'] = array(
     '#type' => 'select', '#title' => t('Number of posts on front page'),
-    '#default_value' => variable_get('default_nodes_main', 10),
+    '#default_value' => $site_config->get('default_nodes_main'),
     '#options' => backdrop_map_assoc(array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30)),
     '#description' => t('The maximum number of posts displayed on overview pages such as the front page.'),
     '#access' => (config_get('system.core', 'site_frontpage') == 'node'),
@@ -1218,7 +1222,7 @@ function system_site_information_settings($form, &$form_state) {
     '#default_value' => $site_config->get('site_403'),
     '#size' => 40,
     '#description' => t('This page is displayed when the requested document is denied to the current user. Leave blank to display a generic "access denied" page.'),
-    '#field_prefix' => url(NULL, array('absolute' => TRUE)) . (variable_get('clean_url', 0) ? '' : '?q=')
+    '#field_prefix' => url(NULL, array('absolute' => TRUE)) . (config_get('system.core', 'clean_url') ? '' : '?q=')
   );
   $form['error_page']['site_404'] = array(
     '#type' => 'textfield',
@@ -1226,7 +1230,7 @@ function system_site_information_settings($form, &$form_state) {
     '#default_value' => $site_config->get('site_404'),
     '#size' => 40,
     '#description' => t('This page is displayed when no other content matches the requested document. Leave blank to display a generic "page not found" page.'),
-    '#field_prefix' => url(NULL, array('absolute' => TRUE)) . (variable_get('clean_url', 0) ? '' : '?q=')
+    '#field_prefix' => url(NULL, array('absolute' => TRUE)) . (config_get('system.core', 'clean_url') ? '' : '?q=')
   );
 
   $form['#validate'][] = 'system_site_information_settings_validate';
@@ -1253,7 +1257,7 @@ function system_site_information_settings($form, &$form_state) {
 
       // Prepare local file path for description.
       if ($original_path && isset($friendly_path)) {
-        $local_file = strtr($original_path, array('public:/' => variable_get('file_public_path', 'files')));
+        $local_file = strtr($original_path, array('public:/' => config_get('system.core', 'file_public_path')));
       }
       else {
         $local_file = path_to_theme() . '/' . $default;
@@ -1439,7 +1443,6 @@ function system_site_information_settings_submit($form, &$form_state) {
 /**
  * Form builder; Cron form.
  *
- * @see system_settings_form()
  * @ingroup forms
  */
 function system_cron_settings($form, &$form_state) {
@@ -1459,7 +1462,7 @@ function system_cron_settings($form, &$form_state) {
   );
 
   $form['cron_url'] = array(
-    '#markup' => '<p>' . t('To run cron from outside the site, go to <a href="!cron">!cron</a>', array('!cron' => url($base_url . '/cron.php', array('external' => TRUE, 'query' => array('cron_key' => variable_get('cron_key', 'backdrop')))))) . '</p>',
+    '#markup' => '<p>' . t('To run cron from outside the site, go to <a href="!cron">!cron</a>', array('!cron' => url($base_url . '/cron.php', array('external' => TRUE, 'query' => array('cron_key' => state_get('cron_key', 'backdrop')))))) . '</p>',
   );
 
   $form['cron'] = array(
@@ -1485,7 +1488,6 @@ function system_cron_settings($form, &$form_state) {
  * Form submit handler; Handle submission for cron settings.
  *
  * @ingroup forms
- * @see system_settings_form()
  */
 function system_cron_settings_submit($form, &$form_state) {
   config('system.core')
@@ -1582,21 +1584,13 @@ function system_performance_settings($form, &$form_state) {
     '#default_value' => $config->get('cache'),
     '#weight' => -2,
   );
-  $period = backdrop_map_assoc(array(0, 60, 180, 300, 600, 900, 1800, 2700, 3600, 10800, 21600, 32400, 43200, 86400), 'format_interval');
-  $period[0] = '<' . t('none') . '>';
-  $form['caching']['cache_lifetime'] = array(
-    '#type' => 'select',
-    '#title' => t('Minimum cache lifetime'),
-    '#default_value' => $config->get('cache_lifetime'),
-    '#options' => $period,
-    '#description' => t('Cached pages will not be re-created until at least this much time has elapsed.'),
-  );
+  $period = backdrop_map_assoc(array(60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 900, 1800, 2700, 3600, 10800, 21600, 32400, 43200, 86400), 'format_interval');
   $form['caching']['page_cache_maximum_age'] = array(
     '#type' => 'select',
     '#title' => t('Expiration of cached pages'),
     '#default_value' => $config->get('page_cache_maximum_age'),
     '#options' => $period,
-    '#description' => t('The maximum time an external cache can use an old version of a page.'),
+    '#description' => t('The maximum time the page cache can use an old version of a page.'),
   );
 
   $directory = 'public://';
@@ -1660,7 +1654,6 @@ function system_performance_settings($form, &$form_state) {
 function system_performance_settings_submit($form, &$form_state) {
   $config = config('system.core');
   $config->set('cache', $form_state['values']['cache']);
-  $config->set('cache_lifetime', $form_state['values']['cache_lifetime']);
   $config->set('page_cache_maximum_age', $form_state['values']['page_cache_maximum_age']);
   $config->set('page_compression', $form_state['values']['page_compression']);
   $config->set('preprocess_css', $form_state['values']['preprocess_css']);
@@ -1691,13 +1684,12 @@ function system_clear_page_cache_submit($form, &$form_state) {
  * Form builder; Configure the site file handling.
  *
  * @ingroup forms
- * @see system_settings_form()
  */
 function system_file_system_settings() {
   $form['file_public_path'] = array(
     '#type' => 'textfield',
     '#title' => t('Public file system path'),
-    '#default_value' => variable_get('file_public_path', 'files'),
+    '#default_value' => config_get('system.core', 'file_public_path'),
     '#maxlength' => 255,
     '#description' => t('A local file system path where public files will be stored. This directory must exist and be writable by Backdrop. This directory must be relative to the Backdrop installation directory and be accessible over the web.'),
     '#after_build' => array('system_check_directory'),
@@ -1706,7 +1698,7 @@ function system_file_system_settings() {
   $form['file_private_path'] = array(
     '#type' => 'textfield',
     '#title' => t('Private file system path'),
-    '#default_value' => variable_get('file_private_path', ''),
+    '#default_value' => config_get('system.core', 'file_private_path'),
     '#maxlength' => 255,
     '#description' => t('An existing local file system path for storing private files. It should be writable by Backdrop and not accessible over the web. See the online handbook for <a href="@handbook">more information about securing private files</a>.', array('@handbook' => 'http://drupal.org/handbook/modules/file')),
     '#after_build' => array('system_check_directory'),
@@ -1715,7 +1707,7 @@ function system_file_system_settings() {
   $form['file_temporary_path'] = array(
     '#type' => 'textfield',
     '#title' => t('Temporary directory'),
-    '#default_value' => variable_get('file_temporary_path', file_directory_temp()),
+    '#default_value' => file_directory_temp(),
     '#maxlength' => 255,
     '#description' => t('A local file system path where temporary files will be stored. This directory should not be accessible over the web.'),
     '#after_build' => array('system_check_directory'),
@@ -1727,30 +1719,51 @@ function system_file_system_settings() {
   }
 
   if (!empty($options)) {
+    $default_scheme = config_get('system.core', 'file_default_scheme');
+    $default_scheme = isset($options[$default_scheme]) ? $default_scheme : key($options);
     $form['file_default_scheme'] = array(
       '#type' => 'radios',
       '#title' => t('Default download method'),
-      '#default_value' => variable_get('file_default_scheme', isset($options['public']) ? 'public' : key($options)),
+      '#default_value' => $default_scheme,
       '#options' => $options,
       '#description' => t('This setting is used as the preferred download method. The use of public files is more efficient, but does not provide any access control.'),
     );
   }
 
-  return system_settings_form($form);
+  $form['actions']['#type'] = 'actions';
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save configuration'),
+  );
+
+  return $form;
+}
+
+/**
+ * Submit handler for system_file_system_settings().
+ */
+function system_file_system_settings_submit($form, &$form_state) {
+  backdrop_set_message(t('The configuration options have been saved.'));
+  $config = config('system.core');
+  $config->set('file_public_path', $form_state['values']['file_public_path']);
+  $config->set('file_private_path', $form_state['values']['file_private_path']);
+  $config->set('file_temporary_path', $form_state['values']['file_temporary_path']);
+  $config->set('file_default_scheme', $form_state['values']['file_default_scheme']);
+  $config->save();
+
 }
 
 /**
  * Form builder; Configure site image toolkit usage.
  *
  * @ingroup forms
- * @see system_settings_form()
  */
 function system_image_toolkit_settings() {
   $toolkits_available = image_get_available_toolkits();
   $current_toolkit = image_get_toolkit();
 
   if (count($toolkits_available) == 0) {
-    variable_del('image_toolkit');
+    config_set('system.core', 'image_toolkit', '');
     $form['image_toolkit_help'] = array(
       '#markup' => t("No image toolkits were detected. Backdrop includes support for <a href='!gd-link'>PHP's built-in image processing functions</a> but they were not detected on this system. You should consult your system administrator to have them enabled, or try using a third party toolkit.", array('gd-link' => url('http://php.net/gd'))),
     );
@@ -1761,12 +1774,15 @@ function system_image_toolkit_settings() {
     $form['image_toolkit'] = array(
       '#type' => 'radios',
       '#title' => t('Select an image processing toolkit'),
-      '#default_value' => variable_get('image_toolkit', $current_toolkit),
+      '#default_value' => $current_toolkit,
       '#options' => $toolkits_available
     );
   }
   else {
-    variable_set('image_toolkit', key($toolkits_available));
+    $form['image_toolkit'] = array(
+      '#type' => 'value',
+      '#value' => $current_toolkit,
+    );
   }
 
   // Get the toolkit's settings form.
@@ -1775,7 +1791,35 @@ function system_image_toolkit_settings() {
     $form['image_toolkit_settings'] = $function();
   }
 
-  return system_settings_form($form);
+  $form['actions']['#type'] = 'actions';
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save configuration'),
+  );
+
+  return $form;
+}
+
+/**
+ * Submit handler for system_image_toolkit_settings().
+ */
+function system_image_toolkit_settings_submit($form, &$form_state) {
+  form_state_values_clean($form_state);
+  $config = config('system.core');
+
+  // Save the toolkit itself.
+  $config->set('image_toolkit', $form_state['values']['image_toolkit']);
+
+  // Save toolkit settings.
+  $toolkit_keys = element_children($form['image_toolkit_settings']);
+  foreach ($form_state['values'] as $key => $value) {
+    if (in_array($key, $toolkit_keys)) {
+      $config->set($key, $value);
+    }
+  }
+
+  $config->save();
+  backdrop_set_message(t('The configuration options have been saved.'));
 }
 
 /**
@@ -1817,6 +1861,18 @@ function system_rss_feeds_settings() {
   );
 
   return $form;
+}
+
+/**
+ * Submit handler for system_rss_feeds_settings().
+ */
+function system_rss_feeds_settings_submit($form, &$form_state) {
+  $config = config('system.core');
+  $config->set('feed_description', $form_state['values']['feed_description']);
+  $config->set('feed_default_items', $form_state['values']['feed_default_items']);
+  $config->set('feed_item_length', $form_state['values']['feed_item_length']);
+  $config->save();
+  backdrop_set_message(t('The configuration options have been saved.'));
 }
 
 /**
@@ -1945,7 +2001,7 @@ function system_site_maintenance_mode($form, &$form_state) {
   $form['maintenance_mode_message'] = array(
     '#type' => 'textarea',
     '#title' => t('Message to display when in maintenance mode'),
-    '#default_value' => t($config->get('maintenance_message'), array('@site' => config_get('system.core', 'site_name'))),
+    '#default_value' => t($config->get('maintenance_mode_message'), array('@site' => config_get('system.core', 'site_name'))),
   );
 
   $form['actions']['#type'] = 'actions';
@@ -1961,7 +2017,7 @@ function system_site_maintenance_mode($form, &$form_state) {
  */
 function system_site_maintenance_mode_submit($form, &$form_state) {
   state_set('maintenance_mode', (int) $form_state['values']['maintenance_mode']);
-  variable_set('maintenance_mode_message', $form_state['values']['maintenance_mode_message']);
+  config_set('system.core', 'maintenance_mode_message', $form_state['values']['maintenance_mode_message']);
 
   // Give specific messages on the primary action for this form.
   if ($form_state['values']['maintenance_mode']) {
@@ -1979,7 +2035,6 @@ function system_site_maintenance_mode_submit($form, &$form_state) {
  * Form builder; Configure clean URL settings.
  *
  * @ingroup forms
- * @see system_settings_form()
  */
 function system_clean_url_settings($form, &$form_state) {
   $available = FALSE;
@@ -2003,7 +2058,7 @@ function system_clean_url_settings($form, &$form_state) {
     else {
       // If the test failed while clean URLs are enabled, make sure clean URLs
       // can be disabled.
-      if (variable_get('clean_url', 0)) {
+      if (config_get('system.core', 'clean_url')) {
         $conflict = TRUE;
         // Warn the user of a conflicting situation, unless after processing
         // a submitted form.
@@ -2024,10 +2079,14 @@ function system_clean_url_settings($form, &$form_state) {
     $form['clean_url'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable clean URLs'),
-      '#default_value' => variable_get('clean_url', 0),
+      '#default_value' => config_get('system.core', 'clean_url'),
       '#description' => t('Use URLs like <code>example.com/user</code> instead of <code>example.com/?q=user</code>.'),
     );
-    $form = system_settings_form($form);
+    $form['actions']['#type'] = 'actions';
+    $form['actions']['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Save configuration'),
+    );
     if ($conflict) {
       // $form_state['redirect'] needs to be set to the non-clean URL,
       // otherwise the setting is not saved.
@@ -2049,12 +2108,10 @@ function system_clean_url_settings($form, &$form_state) {
       '#type' => 'markup',
       '#markup' => '<p>' . t('Clean URLs cannot be enabled. If you are directed to this page or to a <em>Page not found (404)</em> error after testing for clean URLs, see the <a href="@handbook">online handbook</a>.', array('@handbook' => 'http://drupal.org/node/15365')) . '</p>',
     );
-    $form['actions'] = array(
-      '#type' => 'actions',
-      'clean_url_test' => array(
-        '#type' => 'submit',
-        '#value' => t('Run the clean URL test'),
-      ),
+    $form['actions'] = array('#type' => 'actions');
+    $form['actions']['clean_url_test'] = array(
+      '#type' => 'submit',
+      '#value' => t('Run the clean URL test'),
     );
     $form['clean_url_test_execute'] = array(
       '#type' => 'hidden',
@@ -2063,6 +2120,14 @@ function system_clean_url_settings($form, &$form_state) {
   }
 
   return $form;
+}
+
+/**
+ * Submit handler for system_clean_url_settings().
+ */
+function system_clean_url_settings_submit($form, $form_state) {
+  backdrop_set_message(t('The configuration options have been saved.'));
+  config_set('system.core', 'clean_url', $form_state['values']['clean_url']);
 }
 
 /**
@@ -2721,294 +2786,4 @@ function system_date_time_lookup($form, &$form_state) {
   $parent_id = $element['#wrapper_attributes']['id'];
   $commands[] = ajax_command_html("#$parent_id .field-suffix", '<span>' . $element['#field_suffix'] . '</span>');
   return array('#type' => 'ajax', '#commands' => $commands);
-}
-
-/**
- * Menu callback; Displays an overview of available and configured actions.
- */
-function system_actions_manage() {
-  actions_synchronize();
-  $actions = actions_list();
-  $actions_map = actions_actions_map($actions);
-  $options = array();
-  $unconfigurable = array();
-
-  foreach ($actions_map as $key => $array) {
-    if ($array['configurable']) {
-      $options[$key] = $array['label'] . '...';
-    }
-    else {
-      $unconfigurable[] = $array;
-    }
-  }
-
-  $row = array();
-  $instances_present = db_query("SELECT aid FROM {actions} WHERE parameters <> ''")->fetchField();
-  $header = array(
-    array('data' => t('Action type'), 'field' => 'type'),
-    array('data' => t('Label'), 'field' => 'label'),
-    array('data' => $instances_present ? t('Operations') : ''),
-  );
-  $query = db_select('actions')->extend('PagerDefault')->extend('TableSort');
-  $result = $query
-    ->fields('actions')
-    ->limit(50)
-    ->orderByHeader($header)
-    ->execute();
-
-  foreach ($result as $action) {
-    if ($action->parameters) {
-      $links = array();
-      $links['configure'] = array(
-        'title' => t('Configure'),
-        'href' => "admin/config/system/actions/configure/$action->aid",
-      );
-      $links['delete'] = array(
-        'title' => t('Delete'),
-        'href' => "admin/config/system/actions/delete/$action->aid",
-      );
-      $operations = array(
-        '#type' => 'operations',
-        '#links' => $links,
-      );
-    }
-    else {
-      $operations = '';
-    }
-    $row[] = array(
-      array('data' => $action->type),
-      array('data' => check_plain($action->label)),
-      array('data' => $operations),
-    );
-  }
-
-  if ($row) {
-    $pager = theme('pager');
-    if (!empty($pager)) {
-      $row[] = array(array('data' => $pager, 'colspan' => '3'));
-    }
-    $build['system_actions_header'] = array('#markup' => '<h3>' . t('Available actions:') . '</h3>');
-    $build['system_actions_table'] = array('#markup' => theme('table', array('header' => $header, 'rows' => $row)));
-  }
-
-  if ($actions_map) {
-    $build['system_actions_manage_form'] = backdrop_get_form('system_actions_manage_form', $options);
-  }
-
-  return $build;
-}
-
-/**
- * Define the form for the actions overview page.
- *
- * @param $form_state
- *   An associative array containing the current state of the form; not used.
- * @param $options
- *   An array of configurable actions.
- * @return
- *   Form definition.
- *
- * @ingroup forms
- * @see system_actions_manage_form_submit()
- */
-function system_actions_manage_form($form, &$form_state, $options = array()) {
-  $form['parent'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Create an advanced action'),
-    '#attributes' => array('class' => array('container-inline')),
-  );
-  $form['parent']['action'] = array(
-    '#type' => 'select',
-    '#title' => t('Action'),
-    '#title_display' => 'invisible',
-    '#options' => $options,
-    '#empty_option' => t('Choose an advanced action'),
-  );
-  $form['parent']['actions'] = array('#type' => 'actions');
-  $form['parent']['actions']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Create'),
-  );
-  return $form;
-}
-
-/**
- * Process system_actions_manage form submissions.
- *
- * @see system_actions_manage_form()
- */
-function system_actions_manage_form_submit($form, &$form_state) {
-  if ($form_state['values']['action']) {
-    $form_state['redirect'] = 'admin/config/system/actions/configure/' . $form_state['values']['action'];
-  }
-}
-
-/**
- * Menu callback; Creates the form for configuration of a single action.
- *
- * We provide the "Description" field. The rest of the form is provided by the
- * action. We then provide the Save button. Because we are combining unknown
- * form elements with the action configuration form, we use an 'actions_' prefix
- * on our elements.
- *
- * @param $action
- *   Hash of an action ID or an integer. If it is a hash, we are
- *   creating a new instance. If it is an integer, we are editing an existing
- *   instance.
- * @return
- *   A form definition.
- *
- * @see system_actions_configure_validate()
- * @see system_actions_configure_submit()
- */
-function system_actions_configure($form, &$form_state, $action = NULL) {
-  if ($action === NULL) {
-    backdrop_goto('admin/config/system/actions');
-  }
-
-  $actions_map = actions_actions_map(actions_list());
-  $edit = array();
-
-  // Numeric action denotes saved instance of a configurable action.
-  if (is_numeric($action)) {
-    $aid = $action;
-    // Load stored parameter values from database.
-    $data = db_query("SELECT * FROM {actions} WHERE aid = :aid", array(':aid' => $aid))->fetch();
-    $edit['actions_label'] = $data->label;
-    $edit['actions_type'] = $data->type;
-    $function = $data->callback;
-    $action = backdrop_hash_base64($data->callback);
-    $params = unserialize($data->parameters);
-    if ($params) {
-      foreach ($params as $name => $val) {
-        $edit[$name] = $val;
-      }
-    }
-  }
-  // Otherwise, we are creating a new action instance.
-  else {
-    $function = $actions_map[$action]['callback'];
-    $edit['actions_label'] = $actions_map[$action]['label'];
-    $edit['actions_type'] = $actions_map[$action]['type'];
-  }
-
-  $form['actions_label'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Label'),
-    '#default_value' => $edit['actions_label'],
-    '#maxlength' => '255',
-    '#description' => t('A unique label for this advanced action. This label will be displayed in the interface of modules that integrate with actions.'),
-    '#weight' => -10
-  );
-  $action_form = $function . '_form';
-  $form = array_merge($form, $action_form($edit));
-  $form['actions_type'] = array(
-    '#type' => 'value',
-    '#value' => $edit['actions_type'],
-  );
-  $form['actions_action'] = array(
-    '#type' => 'hidden',
-    '#value' => $action,
-  );
-  // $aid is set when configuring an existing action instance.
-  if (isset($aid)) {
-    $form['actions_aid'] = array(
-      '#type' => 'hidden',
-      '#value' => $aid,
-    );
-  }
-  $form['actions_configured'] = array(
-    '#type' => 'hidden',
-    '#value' => '1',
-  );
-  $form['actions'] = array('#type' => 'actions');
-  $form['actions']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Save'),
-    '#weight' => 13
-  );
-
-  return $form;
-}
-
-/**
- * Validate system_actions_configure() form submissions.
- */
-function system_actions_configure_validate($form, &$form_state) {
-  $function = actions_function_lookup($form_state['values']['actions_action']) . '_validate';
-  // Hand off validation to the action.
-  if (function_exists($function)) {
-    $function($form, $form_state);
-  }
-}
-
-/**
- * Process system_actions_configure() form submissions.
- */
-function system_actions_configure_submit($form, &$form_state) {
-  $function = actions_function_lookup($form_state['values']['actions_action']);
-  $submit_function = $function . '_submit';
-
-  // Action will return keyed array of values to store.
-  $params = $submit_function($form, $form_state);
-  $aid = isset($form_state['values']['actions_aid']) ? $form_state['values']['actions_aid'] : NULL;
-
-  actions_save($function, $form_state['values']['actions_type'], $params, $form_state['values']['actions_label'], $aid);
-  backdrop_set_message(t('The action has been successfully saved.'));
-
-  $form_state['redirect'] = 'admin/config/system/actions/manage';
-}
-
-/**
- * Create the form for confirmation of deleting an action.
- *
- * @see system_actions_delete_form_submit()
- * @ingroup forms
- */
-function system_actions_delete_form($form, &$form_state, $action) {
-  $form['aid'] = array(
-    '#type' => 'hidden',
-    '#value' => $action->aid,
-  );
-  return confirm_form($form,
-    t('Are you sure you want to delete the action %action?', array('%action' => $action->label)),
-    'admin/config/system/actions/manage',
-    t('This cannot be undone.'),
-    t('Delete'),
-    t('Cancel')
-  );
-}
-
-/**
- * Process system_actions_delete form submissions.
- *
- * Post-deletion operations for action deletion.
- */
-function system_actions_delete_form_submit($form, &$form_state) {
-  $aid = $form_state['values']['aid'];
-  $action = actions_load($aid);
-  actions_delete($aid);
-  watchdog('user', 'Deleted action %aid (%action)', array('%aid' => $aid, '%action' => $action->label));
-  backdrop_set_message(t('Action %action was deleted', array('%action' => $action->label)));
-  $form_state['redirect'] = 'admin/config/system/actions/manage';
-}
-
-/**
- * Post-deletion operations for deleting action orphans.
- *
- * @param $orphaned
- *   An array of orphaned actions.
- */
-function system_action_delete_orphans_post($orphaned) {
-  foreach ($orphaned as $callback) {
-    backdrop_set_message(t("Deleted orphaned action (%action).", array('%action' => $callback)));
-  }
-}
-
-/**
- * Remove actions that are in the database but not supported by any enabled module.
- */
-function system_actions_remove_orphans() {
-  actions_synchronize(TRUE);
-  backdrop_goto('admin/config/system/actions/manage');
 }

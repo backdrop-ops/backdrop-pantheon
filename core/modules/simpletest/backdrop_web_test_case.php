@@ -487,10 +487,10 @@ abstract class BackdropTestCase {
   }
 
   /**
-   * Logs verbose message in a text file.
+   * Logs a verbose message in a text file.
    *
-   * The a link to the verbose message will be placed in the test results via
-   * as a passing assertion with the text '[verbose message]'.
+   * The link to the verbose message will be placed in the test results as a
+   * passing assertion with the text '[verbose message]'.
    *
    * @param $message
    *   The verbose message to be stored.
@@ -519,7 +519,7 @@ abstract class BackdropTestCase {
   public function run(array $methods = array()) {
     $config = config('simpletest.settings');
     // Initialize verbose debugging.
-    simpletest_verbose(NULL, variable_get('file_public_path', 'files'), get_class($this));
+    simpletest_verbose(NULL, config_get('system.core', 'file_public_path'), get_class($this));
 
     // HTTP auth settings (<username>:<password>) for the simpletest browser
     // when sending requests to the test site.
@@ -773,7 +773,7 @@ class BackdropUnitTestCase extends BackdropTestCase {
     global $conf;
 
     // Store necessary current values before switching to the test environment.
-    $this->originalFileDirectory = variable_get('file_public_path', 'files');
+    $this->originalFileDirectory = config_get('system.core', 'file_public_path');
 
     $this->prepareDatabasePrefix();
 
@@ -1086,6 +1086,7 @@ class BackdropWebTestCase extends BackdropTestCase {
       'body_label' => 'Body',
       'has_title' => 1,
       'has_body' => 1,
+      'is_new' => TRUE,
     );
     // Imposed values for a custom type.
     $forced = array(
@@ -1100,7 +1101,6 @@ class BackdropWebTestCase extends BackdropTestCase {
     $type = (object) $type;
 
     $saved_type = node_type_save($type);
-    node_types_rebuild();
     menu_rebuild();
     node_add_body_field($type);
 
@@ -1142,7 +1142,7 @@ class BackdropWebTestCase extends BackdropTestCase {
       $original = backdrop_get_path('module', 'simpletest') . '/files';
       $files = file_scan_directory($original, '/(html|image|javascript|php|sql)-.*/');
       foreach ($files as $file) {
-        file_unmanaged_copy($file->uri, variable_get('file_public_path', 'files'));
+        file_unmanaged_copy($file->uri, config_get('system.core', 'file_public_path'));
       }
 
       $this->generatedTestFiles = TRUE;
@@ -1195,10 +1195,10 @@ class BackdropWebTestCase extends BackdropTestCase {
    */
   protected function backdropCreateUser(array $permissions = array()) {
     // Create a role with the given permission set, if any.
-    $rid = FALSE;
+    $role_name = FALSE;
     if ($permissions) {
-      $rid = $this->backdropCreateRole($permissions);
-      if (!$rid) {
+      $role_name = $this->backdropCreateRole($permissions);
+      if (!$role_name) {
         return FALSE;
       }
     }
@@ -1209,8 +1209,8 @@ class BackdropWebTestCase extends BackdropTestCase {
     $edit['mail']   = $edit['name'] . '@example.com';
     $edit['pass']   = user_password();
     $edit['status'] = 1;
-    if ($rid) {
-      $edit['roles'] = array($rid => $rid);
+    if ($role_name) {
+      $edit['roles'] = array($role_name);
     }
 
     $account = entity_create('user', $edit);
@@ -1234,7 +1234,7 @@ class BackdropWebTestCase extends BackdropTestCase {
    * @param $name
    *   (optional) String for the name of the role.  Defaults to a random string.
    * @return
-   *   Role ID of newly created role, or FALSE if role creation failed.
+   *   Role name of newly created role, or FALSE if role creation failed.
    */
   protected function backdropCreateRole(array $permissions, $name = NULL) {
     // Generate random name if it was not passed.
@@ -1250,14 +1250,14 @@ class BackdropWebTestCase extends BackdropTestCase {
     // Create new role.
     $role = new stdClass();
     $role->name = $name;
+    $role->label = $name;
     user_role_save($role);
-    user_role_grant_permissions($role->rid, $permissions);
-
-    $this->assertTrue(isset($role->rid), t('Created role of name: @name, id: @rid', array('@name' => $name, '@rid' => (isset($role->rid) ? $role->rid : t('-n/a-')))), t('Role'));
-    if ($role && !empty($role->rid)) {
-      $count = db_query('SELECT COUNT(*) FROM {role_permission} WHERE rid = :rid', array(':rid' => $role->rid))->fetchField();
-      $this->assertTrue($count == count($permissions), t('Created permissions: @perms', array('@perms' => implode(', ', $permissions))), t('Role'));
-      return $role->rid;
+    user_role_grant_permissions($role->name, $permissions);
+    $role = user_role_load($role->name);
+    $this->assertTrue(isset($role->name), t('Created role of name: @name', array('@name' => $name)), t('Role'));
+    if ($role && !empty($role->name)) {
+      $this->assertTrue(count($role->permissions) == count($permissions), t('Created permissions: @perms', array('@perms' => implode(', ', $permissions))), t('Role'));
+      return $role->name;
     }
     else {
       return FALSE;
@@ -1408,22 +1408,22 @@ class BackdropWebTestCase extends BackdropTestCase {
    * @see BackdropWebTestCase::tearDown()
    */
   protected function prepareEnvironment() {
-    global $user, $language_interface, $settings, $config_directories;
+    global $user, $language, $settings, $config_directories;
 
     // Store necessary current values before switching to prefixed database.
-    $this->originalLanguage = $language_interface;
-    $this->originalLanguageDefault = variable_get('language_default');
+    $this->originalLanguage = $language;
+    $this->originalLanguageDefault = config_get('system.core', 'language_default');
     $this->originalConfigDirectories = $config_directories;
-    $this->originalFileDirectory = variable_get('file_public_path', 'files');
+    $this->originalFileDirectory = config_get('system.core', 'file_public_path', 'files');
     $this->originalProfile = backdrop_get_profile();
-    $this->originalCleanUrl = variable_get('clean_url', 0);
+    $this->originalCleanUrl = config_get('system.core', 'clean_url');
     $this->originalUser = $user;
     $this->originalSettings = $settings;
 
     // Set to English to prevent exceptions from utf8_truncate() from t()
     // during install if the current language is not 'en'.
     // The following array/object conversion is copied from language_default().
-    $language_interface = (object) array(
+    $language = (object) array(
       'langcode' => 'en',
       'name' => 'English',
       'direction' => 0,
@@ -1529,16 +1529,20 @@ class BackdropWebTestCase extends BackdropTestCase {
     // the test's profile as a module. Without this, the installation profile of
     // the parent site (executing the test) is registered, and the test
     // profile's hook_install() and other hook implementations are never invoked.
-    $conf['install_profile'] = $this->profile;
+    config_install_default_config('system');
+    config_set('system.core', 'install_profile', $this->profile);
 
     // Perform the actual Backdrop installation.
     include_once BACKDROP_ROOT . '/core/includes/install.inc';
     backdrop_install_system();
 
     // Set path variables.
-    variable_set('file_public_path', $this->public_files_directory);
-    variable_set('file_private_path', $this->private_files_directory);
-    variable_set('file_temporary_path', $this->temp_files_directory);
+    $core_config = config('system.core');
+    $core_config->set('file_default_scheme', 'public');
+    $core_config->set('file_public_path', $this->public_files_directory);
+    $core_config->set('file_private_path', $this->private_files_directory);
+    $core_config->set('file_temporary_path', $this->temp_files_directory);
+    $core_config->save();
 
     // Set 'parent_profile' of simpletest to add the parent profile's
     // search path to the child site's search paths.
@@ -1550,7 +1554,7 @@ class BackdropWebTestCase extends BackdropTestCase {
     backdrop_static_reset('backdrop_get_schema_versions');
 
     // Include the testing profile.
-    variable_set('install_profile', $this->profile);
+    config_set('system.core', 'install_profile', $this->profile);
     $profile_details = install_profile_info($this->profile, 'en');
 
     // Install the modules specified by the testing profile.
@@ -1591,16 +1595,17 @@ class BackdropWebTestCase extends BackdropTestCase {
 
     // Restore necessary variables.
     state_set('install_task', 'done');
-    variable_set('clean_url', $this->originalCleanUrl);
+    config_set('system.core', 'clean_url', $this->originalCleanUrl);
     config_set('system.core', 'site_mail', 'simpletest@example.com');
     config_set('system.date', 'date_default_timezone', date_default_timezone_get());
+    backdrop_static_reset('url');
 
     // Set up English language.
     unset($conf['language_default']);
-    $language_interface = language_default();
+    $language = language_default();
 
     // Use the test mail class instead of the default mail handler class.
-    variable_set('mail_system', array('default-system' => 'TestingMailSystem'));
+    config_set('system.mail', 'default-system', 'TestingMailSystem');
 
     backdrop_set_time_limit($this->timeLimit);
     $this->setup = TRUE;
@@ -1649,6 +1654,7 @@ class BackdropWebTestCase extends BackdropTestCase {
     cache('bootstrap')->delete('variables');
     $conf = variable_initialize();
     backdrop_static_reset('states');
+    backdrop_static_reset('config');
   }
 
   /**
@@ -1656,7 +1662,7 @@ class BackdropWebTestCase extends BackdropTestCase {
    * and reset the database prefix.
    */
   protected function tearDown() {
-    global $user, $language_interface, $settings, $config_directories;
+    global $user, $language, $settings, $config_directories;
 
     // In case a fatal error occurred that was not in the test process read the
     // log to pick up any fatal errors.
@@ -1731,7 +1737,7 @@ class BackdropWebTestCase extends BackdropTestCase {
     $GLOBALS['conf']['file_public_path'] = $this->originalFileDirectory;
 
     // Reset language.
-    $language_interface = $this->originalLanguage;
+    $language = $this->originalLanguage;
     if ($this->originalLanguageDefault) {
       $GLOBALS['conf']['language_default'] = $this->originalLanguageDefault;
     }
@@ -2613,7 +2619,7 @@ class BackdropWebTestCase extends BackdropTestCase {
    *
    * @param $xpath
    *   The xpath string to use in the search.
-   * @return
+   * @return SimpleXmlElement
    *   The return value of the xpath search. For details on the xpath string
    *   format and return values see the SimpleXML documentation,
    *   http://us.php.net/manual/function.simplexml-element-xpath.php.
@@ -2949,7 +2955,7 @@ class BackdropWebTestCase extends BackdropTestCase {
     $this->plainTextContent = FALSE;
     $this->elements = FALSE;
     $this->backdropSettings = array();
-    if (preg_match('/jQuery\.extend\(Backdrop\.settings, (.*?)\);/', $content, $matches)) {
+    if (preg_match('/window.Backdrop = {settings: (.*)}/', $content, $matches)) {
       $this->backdropSettings = backdrop_json_decode($matches[1]);
     }
   }
@@ -3805,7 +3811,7 @@ function simpletest_verbose($message, $original_file_directory = NULL, $test_cla
   if ($original_file_directory) {
     $file_directory = $original_file_directory;
     $class = $test_class;
-    $verbose = variable_get('simpletest_verbose', TRUE);
+    $verbose = config_get('simpletest.settings', 'simpletest_verbose', TRUE);
     $directory = $file_directory . '/simpletest/verbose';
     $writable = file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
     if ($writable && !file_exists($directory . '/.htaccess')) {

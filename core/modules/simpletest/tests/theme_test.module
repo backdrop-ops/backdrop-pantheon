@@ -142,8 +142,8 @@ function _theme_test_suggestion() {
  * Implements hook_preprocess_page().
  */
 function theme_test_preprocess_page(&$variables) {
-  $variables['html_attributes_array']['theme_test_html_attribute'] = 'theme test html attribute value';
-  $variables['body_attributes_array']['theme_test_body_attribute'] = 'theme test body attribute value';
+  $variables['html_attributes']['theme_test_html_attribute'] = 'theme test html attribute value';
+  $variables['body_attributes']['theme_test_body_attribute'] = 'theme test body attribute value';
 }
 
 /**
@@ -151,4 +151,13 @@ function theme_test_preprocess_page(&$variables) {
  */
 function theme_theme_test_foo($variables) {
   return $variables['foo'];
+}
+
+/**
+ * Implements hook_system_info_alter().
+ */
+function theme_test_system_info_alter(&$info, $file, $type) {
+  if ($type === 'theme' && $file->name === 'stark') {
+    unset($info['hidden']);
+  }
 }

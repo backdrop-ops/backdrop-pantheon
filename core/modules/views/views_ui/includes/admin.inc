@@ -835,16 +835,15 @@ function views_ui_taxonomy_autocomplete_validate($element, &$form_state) {
     $field = field_info_field($element['#field_name']);
     $vocabularies = array();
     if (!empty($field['settings']['allowed_values'])) {
-      foreach ($field['settings']['allowed_values'] as $tree) {
-        if ($vocabulary = taxonomy_vocabulary_machine_name_load($tree['vocabulary'])) {
-          $vocabularies[$vocabulary->vid] = $tree['vocabulary'];
-        }
+      $vocabularies = $field['settings']['allowed_values'];
+      foreach ($vocabularies as $index => $settings) {
+        $vocabularies[$index] = $settings['vocabulary'];
       }
     }
     // Store the term ID of each (valid) tag that the user typed.
     $typed_terms = backdrop_explode_tags($tags);
     foreach ($typed_terms as $typed_term) {
-      if ($terms = taxonomy_term_load_multiple(array(), array('name' => trim($typed_term), 'vid' => array_keys($vocabularies)))) {
+      if ($terms = taxonomy_term_load_multiple(array(), array('name' => trim($typed_term), 'vocabulary' => $vocabularies))) {
         $term = array_pop($terms);
         $value['tids'][] = $term->tid;
       }
@@ -1804,14 +1803,14 @@ function template_preprocess_views_ui_display_tab_setting(&$variables) {
   $variables['settings_links'] = implode('<span class="label">&nbsp;|&nbsp;</span>', $variables['settings_links']);
 
   // Add classes associated with this display tab to the overall list.
-  $variables['classes_array'] = array_merge($variables['classes_array'], $variables['class']);
+  $variables['classes'] = array_merge($variables['classes'], $variables['class']);
 
   if (!empty($variables['defaulted'])) {
-    $variables['classes_array'][] = 'defaulted';
+    $variables['classes'][] = 'defaulted';
   }
   if (!empty($variables['overridden'])) {
-    $variables['classes_array'][] = 'overridden';
-    $variables['attributes_array']['title'][] = t('Overridden');
+    $variables['classes'][] = 'overridden';
+    $variables['attributes']['title'][] = t('Overridden');
   }
 
   // Append a colon to the description, if requested.
@@ -1828,11 +1827,11 @@ function template_preprocess_views_ui_display_tab_bucket(&$variables) {
     $variables['item_help_icon'] = render($element['#item_help_icon']);
   }
   if (!empty($element['#name'])) {
-    $variables['classes_array'][] = backdrop_clean_css_identifier(strtolower($element['#name']));
+    $variables['classes'][] = backdrop_clean_css_identifier(strtolower($element['#name']));
   }
   if (!empty($element['#overridden'])) {
-    $variables['classes_array'][] = 'overridden';
-    $variables['attributes_array']['title'][] = t('Overridden');
+    $variables['classes'][] = 'overridden';
+    $variables['attributes']['title'][] = t('Overridden');
   }
 
   $variables['content'] = $element['#children'];
@@ -3211,17 +3210,6 @@ function views_ui_reorder_displays_form($form, &$form_state) {
 }
 
 /**
- * Display position sorting function
- */
-function _views_position_sort($display1, $display2) {
-  if ($display1->position != $display2->position) {
-    return $display1->position < $display2->position ? -1 : 1;
-  }
-
-  return 0;
-}
-
-/**
  * Submit handler for rearranging display form
  */
 function views_ui_reorder_displays_form_submit($form, &$form_state) {
@@ -3259,7 +3247,12 @@ function views_ui_reorder_displays_form_submit($form, &$form_state) {
   }
 
   // Sorting back the display array as the position is not enough
-  uasort($form_state['view']->display, '_views_position_sort');
+  uasort($form_state['view']->display, function($display1, $display2) {
+    if ($display1->position != $display2->position) {
+      return $display1->position < $display2->position ? -1 : 1;
+    }
+    return 0;
+  });
 
   // Store in cache
   views_ui_cache_set($form_state['view']);
@@ -4892,22 +4885,6 @@ function views_ui_config_style_form_submit($form, &$form_state) {
 
   // Write to cache
   views_ui_cache_set($form_state['view']);
-}
-
-/**
- * Get a list of roles in the system.
- */
-function views_ui_get_roles() {
-  static $roles = NULL;
-  if (!isset($roles)) {
-    $roles = array();
-    $result = db_query("SELECT r.rid, r.name FROM {role} r ORDER BY r.name");
-    foreach ($result as $obj) {
-      $roles[$obj->rid] = $obj->name;
-    }
-  }
-
-  return $roles;
 }
 
 /**

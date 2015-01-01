@@ -79,7 +79,7 @@ function search_view($module = NULL, $keys = '') {
  * @see search-results.tpl.php
  */
 function template_preprocess_search_results(&$variables) {
-  global $language_interface;
+  global $language;
   $variables['search_results'] = array();
   if (!empty($variables['module'])) {
     $variables['module'] = check_plain($variables['module']);
@@ -116,9 +116,8 @@ function template_preprocess_search_results(&$variables) {
       'attributes' => $attributes,
     );
     
-    if (isset($result['language']) && $result['language'] != $language_interface->langcode && $result['language'] != LANGUAGE_NONE) {
-      $variables['title_attributes_array']['lang'] = $result['language'];
-      $variables['content_attributes_array']['lang'] = $result['language'];
+    if (isset($result['language']) && $result['language'] != $language->langcode && $result['language'] != LANGUAGE_NONE) {
+      $variables['content_attributes']['lang'] = $result['language'];
     }
   }
     $variables['pager'] = theme('pager', array('tags' => NULL));

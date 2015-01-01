@@ -80,11 +80,11 @@ function user_pass_validate($form, &$form_state) {
  * Submit handler for user_pass().
  */
 function user_pass_submit($form, &$form_state) {
-  global $language_interface;
+  global $language;
 
   $account = $form_state['values']['account'];
   // Mail one time login URL and instructions using current language.
-  $mail = _user_mail_notify('password_reset', $account, $language_interface);
+  $mail = _user_mail_notify('password_reset', $account, $language);
   if (!empty($mail)) {
     watchdog('user', 'Password reset instructions mailed to %name at %email.', array('%name' => $account->name, '%email' => $account->mail));
     backdrop_set_message(t('Further instructions have been sent to your e-mail address.'));
@@ -325,6 +325,9 @@ function user_profile_form_submit($form, &$form_state) {
   // Remove unneeded values.
   form_state_values_clean($form_state);
 
+  // Convert checkbox values to an unindexed list.
+  $form_state['values']['roles'] = array_keys(array_filter($form_state['values']['roles']));
+
   entity_form_submit_build_entity('user', $account, $form, $form_state);
   $account->save();
   $form_state['values']['uid'] = $account->uid;
@@ -333,8 +336,6 @@ function user_profile_form_submit($form, &$form_state) {
     // Remove the password reset tag since a new password was saved.
     unset($_SESSION['pass_reset_'. $account->uid]);
   }
-  // Clear the page cache because pages can contain usernames and/or profile information:
-  cache_clear_all();
 
   backdrop_set_message(t('The changes have been saved.'));
 }
@@ -365,7 +366,6 @@ function user_cancel_confirm_form($form, &$form_state, $account) {
   $form['_account'] = array('#type' => 'value', '#value' => $account);
 
   // Display account cancellation method selection, if allowed.
-  $default_method = variable_get('user_cancel_method', 'user_cancel_block');
   $admin_access = user_access('administer users');
   $can_select_method = $admin_access || user_access('select account cancellation method');
   $form['user_cancel_method'] = array(
@@ -497,7 +497,7 @@ function user_cancel_methods() {
   backdrop_alter('user_cancel_methods', $methods);
 
   // Turn all methods into real form elements.
-  $default_method = variable_get('user_cancel_method', 'user_cancel_block');
+  $default_method = config_get('system.core', 'user_cancel_method');
   foreach ($methods as $name => $method) {
     $form[$name] = array(
       '#type' => 'radio',

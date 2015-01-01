@@ -468,13 +468,6 @@ class FileValidatorTest extends BackdropWebTestCase {
     $original_user = $user;
     backdrop_save_session(FALSE);
 
-    // Run these test as uid = 1.
-    $user = user_load(1);
-
-    $file = entity_create('file', array('filesize' => 999999));
-    $errors = file_validate_size($file, 1, 1);
-    $this->assertEqual(count($errors), 0, 'No size limits enforced on uid=1.', 'File');
-
     // Run these tests as a regular user.
     $user = $this->backdropCreateUser();
 
@@ -517,7 +510,7 @@ class FileUnmanagedSaveDataTest extends FileTestCase {
     $this->assertTrue($filepath, 'Unnamed file saved correctly.');
     $this->assertEqual('asdf.txt', backdrop_basename($filepath), 'File was named correctly.');
     $this->assertEqual($contents, file_get_contents($filepath), 'Contents of the file are correct.');
-    $this->assertFilePermissions($filepath, variable_get('file_chmod_file', 0664));
+    $this->assertFilePermissions($filepath, settings_get('file_chmod_file', 0664));
   }
 }
 
@@ -527,7 +520,7 @@ class FileUnmanagedSaveDataTest extends FileTestCase {
 class RemoteFileUnmanagedSaveDataTest extends FileUnmanagedSaveDataTest {
   function setUp() {
     parent::setUp('file_test');
-    variable_set('file_default_scheme', 'dummy-remote');
+    config_set('system.core', 'file_default_scheme', 'dummy-remote');
   }
 }
 
@@ -720,7 +713,10 @@ class FileSaveUploadTest extends FileHookTestCase {
 
     // Ensure dangerous files are not renamed when insecure uploads is TRUE.
     // Turn on insecure uploads.
-    variable_set('allow_insecure_uploads', 1);
+    tempstore_set('simpletest', 'settings', array(
+      'allow_insecure_uploads' => 1,
+    ), REQUEST_TIME + 3600);
+
     // Reset the hook counters.
     file_test_reset();
 
@@ -734,15 +730,13 @@ class FileSaveUploadTest extends FileHookTestCase {
     $this->assertFileHooksCalled(array('validate', 'insert'));
 
     // Turn off insecure uploads.
-    variable_set('allow_insecure_uploads', 0);
+    tempstore_clear('simpletest', 'settings');
   }
 
   /**
    * Test file munge handling.
    */
   function testHandleFileMunge() {
-    // Ensure insecure uploads are disabled for this test.
-    variable_set('allow_insecure_uploads', 0);
     $this->image = file_move($this->image, $this->image->uri . '.foo.' . $this->image_extension);
 
     // Reset the hook counters to get rid of the 'move' we just called.
@@ -849,7 +843,7 @@ class FileSaveUploadTest extends FileHookTestCase {
 class RemoteFileSaveUploadTest extends FileSaveUploadTest {
   function setUp() {
     parent::setUp('file_test');
-    variable_set('file_default_scheme', 'dummy-remote');
+    config_set('system.core', 'file_default_scheme', 'dummy-remote');
   }
 }
 
@@ -889,7 +883,7 @@ class FileDirectoryTest extends FileTestCase {
     }
 
     // Test that the directory has the correct permissions.
-    $this->assertDirectoryPermissions($directory, variable_get('file_chmod_directory', 0775));
+    $this->assertDirectoryPermissions($directory, settings_get('file_chmod_directory', 0775));
 
     // Remove .htaccess file to then test that it gets re-created.
     @backdrop_unlink(file_default_scheme() . '://.htaccess');
@@ -959,12 +953,12 @@ class FileDirectoryTest extends FileTestCase {
    * Ensure that the file_directory_temp() function always returns a value.
    */
   function testFileDirectoryTemp() {
-    // Start with an empty variable to ensure we have a clean slate.
-    variable_set('file_temporary_path', '');
+    // Start with an empty config to ensure we have a clean slate.
+    config_set('system.core', 'file_temporary_path', '');
     $tmp_directory = file_directory_temp();
     $this->assertEqual(empty($tmp_directory), FALSE, 'file_directory_temp() returned a non-empty value.');
-    $setting = variable_get('file_temporary_path', '');
-    $this->assertEqual($setting, $tmp_directory, "The 'file_temporary_path' variable has the same value that file_directory_temp() returned.");
+    $setting = config_get('system.core', 'file_temporary_path', '');
+    $this->assertEqual($setting, $tmp_directory, "The 'file_temporary_path' config setting has the same value that file_directory_temp() returned.");
   }
 }
 
@@ -974,7 +968,7 @@ class FileDirectoryTest extends FileTestCase {
 class RemoteFileDirectoryTest extends FileDirectoryTest {
   function setUp() {
     parent::setUp('file_test');
-    variable_set('file_default_scheme', 'dummy-remote');
+    config_set('system.core', 'file_default_scheme', 'dummy-remote');
   }
 }
 
@@ -1105,7 +1099,7 @@ class FileScanDirectoryTest extends FileTestCase {
 class RemoteFileScanDirectoryTest extends FileScanDirectoryTest {
   function setUp() {
     parent::setUp('file_test');
-    variable_set('file_default_scheme', 'dummy-remote');
+    config_set('system.core', 'file_default_scheme', 'dummy-remote');
   }
 }
 
@@ -1152,7 +1146,7 @@ class FileUnmanagedDeleteTest extends FileTestCase {
 class RemoteFileUnmanagedDeleteTest extends FileUnmanagedDeleteTest {
   function setUp() {
     parent::setUp('file_test');
-    variable_set('file_default_scheme', 'dummy-remote');
+    config_set('system.core', 'file_default_scheme', 'dummy-remote');
   }
 }
 
@@ -1230,7 +1224,7 @@ class FileUnmanagedDeleteRecursiveTest extends FileTestCase {
 class RemoteFileUnmanagedDeleteRecursiveTest extends FileUnmanagedDeleteRecursiveTest {
   function setUp() {
     parent::setUp('file_test');
-    variable_set('file_default_scheme', 'dummy-remote');
+    config_set('system.core', 'file_default_scheme', 'dummy-remote');
   }
 }
 
@@ -1252,7 +1246,7 @@ class FileUnmanagedMoveTest extends FileTestCase {
     $this->assertEqual($new_filepath, $desired_filepath, 'Returned expected filepath.');
     $this->assertTrue(file_exists($new_filepath), 'File exists at the new location.');
     $this->assertFalse(file_exists($file->uri), 'No file remains at the old location.');
-    $this->assertFilePermissions($new_filepath, variable_get('file_chmod_file', 0664));
+    $this->assertFilePermissions($new_filepath, settings_get('file_chmod_file', 0664));
 
     // Moving with rename.
     $desired_filepath = 'public://' . $this->randomName();
@@ -1263,7 +1257,7 @@ class FileUnmanagedMoveTest extends FileTestCase {
     $this->assertNotEqual($newer_filepath, $desired_filepath, 'Returned expected filepath.');
     $this->assertTrue(file_exists($newer_filepath), 'File exists at the new location.');
     $this->assertFalse(file_exists($new_filepath), 'No file remains at the old location.');
-    $this->assertFilePermissions($newer_filepath, variable_get('file_chmod_file', 0664));
+    $this->assertFilePermissions($newer_filepath, settings_get('file_chmod_file', 0664));
 
     // TODO: test moving to a directory (rather than full directory/file path)
     // TODO: test creating and moving normal files (rather than streams)
@@ -1304,7 +1298,7 @@ class FileUnmanagedMoveTest extends FileTestCase {
 class RemoteFileUnmanagedMoveTest extends FileUnmanagedMoveTest {
   function setUp() {
     parent::setUp('file_test');
-    variable_set('file_default_scheme', 'dummy-remote');
+    config_set('system.core', 'file_default_scheme', 'dummy-remote');
   }
 }
 
@@ -1326,7 +1320,7 @@ class FileUnmanagedCopyTest extends FileTestCase {
     $this->assertEqual($new_filepath, $desired_filepath, 'Returned expected filepath.');
     $this->assertTrue(file_exists($file->uri), 'Original file remains.');
     $this->assertTrue(file_exists($new_filepath), 'New file exists.');
-    $this->assertFilePermissions($new_filepath, variable_get('file_chmod_file', 0664));
+    $this->assertFilePermissions($new_filepath, settings_get('file_chmod_file', 0664));
 
     // Copying with rename.
     $desired_filepath = 'public://' . $this->randomName();
@@ -1336,7 +1330,7 @@ class FileUnmanagedCopyTest extends FileTestCase {
     $this->assertNotEqual($newer_filepath, $desired_filepath, 'Returned expected filepath.');
     $this->assertTrue(file_exists($file->uri), 'Original file remains.');
     $this->assertTrue(file_exists($newer_filepath), 'New file exists.');
-    $this->assertFilePermissions($newer_filepath, variable_get('file_chmod_file', 0664));
+    $this->assertFilePermissions($newer_filepath, settings_get('file_chmod_file', 0664));
 
     // TODO: test copying to a directory (rather than full directory/file path)
     // TODO: test copying normal files using normal paths (rather than only streams)
@@ -1366,7 +1360,7 @@ class FileUnmanagedCopyTest extends FileTestCase {
     $this->assertNotEqual($new_filepath, $file->uri, 'Copied file has a new name.');
     $this->assertTrue(file_exists($file->uri), 'Original file exists after copying onto itself.');
     $this->assertTrue(file_exists($new_filepath), 'Copied file exists after copying onto itself.');
-    $this->assertFilePermissions($new_filepath, variable_get('file_chmod_file', 0664));
+    $this->assertFilePermissions($new_filepath, settings_get('file_chmod_file', 0664));
 
     // Copy the file onto itself without renaming fails.
     $new_filepath = file_unmanaged_copy($file->uri, $file->uri, FILE_EXISTS_ERROR);
@@ -1384,7 +1378,7 @@ class FileUnmanagedCopyTest extends FileTestCase {
     $this->assertNotEqual($new_filepath, $file->uri, 'Copied file has a new name.');
     $this->assertTrue(file_exists($file->uri), 'Original file exists after copying onto itself.');
     $this->assertTrue(file_exists($new_filepath), 'Copied file exists after copying onto itself.');
-    $this->assertFilePermissions($new_filepath, variable_get('file_chmod_file', 0664));
+    $this->assertFilePermissions($new_filepath, settings_get('file_chmod_file', 0664));
   }
 }
 
@@ -1394,7 +1388,7 @@ class FileUnmanagedCopyTest extends FileTestCase {
 class RemoteFileUnmanagedCopyTest extends FileUnmanagedCopyTest {
   function setUp() {
     parent::setUp('file_test');
-    variable_set('file_default_scheme', 'dummy-remote');
+    config_set('system.core', 'file_default_scheme', 'dummy-remote');
   }
 }
 
@@ -2243,7 +2237,8 @@ class FileDownloadTest extends FileTestCase {
    *   The value of the clean_url setting
    */
   private function checkUrl($scheme, $directory, $filename, $expected_url, $clean_url = '1') {
-    variable_set('clean_url', $clean_url);
+    config_set('system.core', 'clean_url', $clean_url);
+    backdrop_static_reset('url');
 
     // Convert $filename to a valid filename, i.e. strip characters not
     // supported by the filesystem, and create the file in the specified
@@ -2355,8 +2350,6 @@ class FileNameMungingTest extends FileTestCase {
    * Create a file and munge/unmunge the name.
    */
   function testMunging() {
-    // Disable insecure uploads.
-    variable_set('allow_insecure_uploads', 0);
     $munged_name = file_munge_filename($this->name, '', TRUE);
     $messages = backdrop_get_messages();
     $this->assertTrue(in_array(t('For security reasons, your upload has been renamed to %filename.', array('%filename' => $munged_name)), $messages['status']), 'Alert properly set when a file is renamed.');
@@ -2377,7 +2370,7 @@ class FileNameMungingTest extends FileTestCase {
    * come out untouched, no matter how evil the filename.
    */
   function testMungeIgnoreInsecure() {
-    variable_set('allow_insecure_uploads', 1);
+    $GLOBALS['settings']['allow_insecure_uploads'] = 1;
     $munged_name = file_munge_filename($this->name, '');
     $this->assertIdentical($munged_name, $this->name, format_string('The original filename (%original) matches the munged filename (%munged) when insecure uploads are enabled.', array('%munged' => $munged_name, '%original' => $this->name)));
   }
@@ -2533,10 +2526,10 @@ class StreamWrapperTest extends BackdropWebTestCase {
 
     // Test file_build_uri() and BackdropLocalStreamWrapper::getDirectoryPath().
     $this->assertEqual(file_build_uri('foo/bar.txt'), 'public://foo/bar.txt', 'Expected scheme was added.');
-    $this->assertEqual(file_stream_wrapper_get_instance_by_scheme('public')->getDirectoryPath(), variable_get('file_public_path'), 'Expected default directory path was returned.');
-    $this->assertEqual(file_stream_wrapper_get_instance_by_scheme('temporary')->getDirectoryPath(), variable_get('file_temporary_path'), 'Expected temporary directory path was returned.');
+    $this->assertEqual(file_stream_wrapper_get_instance_by_scheme('public')->getDirectoryPath(), config_get('system.core', 'file_public_path'), 'Expected default directory path was returned.');
+    $this->assertEqual(file_stream_wrapper_get_instance_by_scheme('temporary')->getDirectoryPath(), config_get('system.core', 'file_temporary_path'), 'Expected temporary directory path was returned.');
 
-    variable_set('file_default_scheme', 'private');
+    config_set('system.core', 'file_default_scheme', 'private');
     $this->assertEqual(file_build_uri('foo/bar.txt'), 'private://foo/bar.txt', 'Got a valid URI from foo/bar.txt.');
   }
 

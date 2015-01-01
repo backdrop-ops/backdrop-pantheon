@@ -16,7 +16,7 @@ function file_field_info() {
       'settings' => array(
         'display_field' => 0,
         'display_default' => 0,
-        'uri_scheme' => variable_get('file_default_scheme', 'public'),
+        'uri_scheme' => config_get('system.core', 'file_default_scheme'),
       ),
       'instance_settings' => array(
         'file_extensions' => 'txt',
@@ -92,6 +92,7 @@ function file_field_instance_settings_form($field, $instance) {
     '#description' => t('Separate extensions with a space or comma and do not include the leading dot.'),
     '#element_validate' => array('_file_generic_settings_extensions'),
     '#weight' => 1,
+    '#maxlength' => 256,
     // By making this field required, we prevent a potential security issue
     // that would allow files of any type to be uploaded.
     '#required' => TRUE,
@@ -582,10 +583,10 @@ function file_field_widget_process($element, &$form_state, $form) {
   // Add the description field if enabled.
   if (!empty($instance['settings']['description_field']) && $item['fid']) {
     $element['description'] = array(
-      '#type' => variable_get('file_description_type', 'textfield'),
+      '#type' => 'textfield',
       '#title' => t('Description'),
       '#value' => isset($item['description']) ? $item['description'] : '',
-      '#maxlength' => variable_get('file_description_length', 128),
+      '#maxlength' => 500,
       '#description' => t('The description may be used as the label of the link to the file.'),
     );
   }

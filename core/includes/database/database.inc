@@ -735,7 +735,7 @@ abstract class DatabaseConnection extends PDO {
     // to expand it out into a comma-delimited set of placeholders.
     foreach (array_filter($args, 'is_array') as $key => $data) {
       $new_keys = array();
-      foreach ($data as $i => $value) {
+      foreach (array_values($data) as $i => $value) {
         // This assumes that there are no other placeholders that use the same
         // name.  For example, if the array placeholder is defined as :example
         // and there is already an :example_2 placeholder, this will generate
@@ -1298,9 +1298,8 @@ abstract class DatabaseConnection extends PDO {
    * Retrieves an unique id from a given sequence.
    *
    * Use this function if for some reason you can't use a serial field. For
-   * example, MySQL has no ways of reading of the current value of a sequence
-   * and PostgreSQL can not advance the sequence to be larger than a given
-   * value. Or sometimes you just need a unique integer.
+   * example, MySQL has no ways of reading of the current value of a sequence.
+   * Or sometimes you just need a unique integer.
    *
    * @param $existing_id
    *   After a database import, it might be that the sequences table is behind,
@@ -2989,12 +2988,6 @@ function db_drop_index($table, $name) {
  *   array('primary key' => array('bar')));
  * @endcode
  *
- * The reasons for this are due to the different database engines:
- *
- * On PostgreSQL, changing a field definition involves adding a new field and
- * dropping an old one which causes any indices, primary keys and sequences
- * (from serial-type fields) that use the changed field to be dropped.
- *
  * On MySQL, all type 'serial' fields must be part of at least one key or index
  * as soon as they are created. You cannot use
  * db_add_{primary_key,unique_key,index}() for this purpose because the ALTER
@@ -3039,7 +3032,7 @@ function db_ignore_slave() {
     // Five minutes is long enough to allow the slave to break and resume
     // interrupted replication without causing problems on the Backdrop site
     // from the old data.
-    $duration = variable_get('maximum_replication_lag', 300);
+    $duration = settings_get('maximum_replication_lag', 300);
     // Set session variable with amount of time to delay before using slave.
     $_SESSION['ignore_slave_server'] = REQUEST_TIME + $duration;
   }

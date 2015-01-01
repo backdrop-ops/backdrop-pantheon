@@ -1988,18 +1988,20 @@ function form_builder($form_id, &$element, &$form_state) {
  */
 function _form_builder_handle_input_element($form_id, &$element, &$form_state) {
   if (!isset($element['#name'])) {
-    $name = array_shift($element['#parents']);
-    $element['#name'] = $name;
     if ($element['#type'] == 'file') {
       // To make it easier to handle $_FILES in file.inc, we place all
       // file fields in the 'files' array. Also, we do not support
       // nested file names.
-      $element['#name'] = 'files[' . $element['#name'] . ']';
+      $element['#name'] = 'files[' . implode('_', $element['#parents']) . ']';
     }
-    elseif (count($element['#parents'])) {
-      $element['#name'] .= '[' . implode('][', $element['#parents']) . ']';
+    else {
+      $name = array_shift($element['#parents']);
+      $element['#name'] = $name;
+      if (count($element['#parents'])) {
+        $element['#name'] .= '[' . implode('][', $element['#parents']) . ']';
+      }
+      array_unshift($element['#parents'], $name);
     }
-    array_unshift($element['#parents'], $name);
   }
 
   // Setting #disabled to TRUE results in user input being ignored, regardless
@@ -2609,7 +2611,7 @@ function _form_options_flatten($array) {
       _form_options_flatten($value);
     }
     else {
-      $return[$key] = 1;
+      $return[$key] = $value;
     }
   }
 
@@ -3922,8 +3924,8 @@ function theme_search($variables) {
   _form_set_class($element, array('form-search'));
 
   $extra = '';
-  if ($element['#autocomplete_path'] && drupal_valid_path($element['#autocomplete_path'])) {
-    drupal_add_library('system', 'drupal.autocomplete');
+  if ($element['#autocomplete_path'] && backdrop_valid_path($element['#autocomplete_path'])) {
+    backdrop_add_library('system', 'drupal.autocomplete');
     $element['#attributes']['class'][] = 'form-autocomplete';
 
     $attributes = array();
@@ -3932,10 +3934,10 @@ function theme_search($variables) {
     $attributes['value'] = url($element['#autocomplete_path'], array('absolute' => TRUE));
     $attributes['disabled'] = 'disabled';
     $attributes['class'][] = 'autocomplete';
-    $extra = '<input' . drupal_attributes($attributes) . ' />';
+    $extra = '<input' . backdrop_attributes($attributes) . ' />';
   }
 
-  $output = '<input' . drupal_attributes($element['#attributes']) . ' />';
+  $output = '<input' . backdrop_attributes($element['#attributes']) . ' />';
 
   return $output . $extra;
 }
@@ -4232,8 +4234,7 @@ function form_process_weight($element) {
   $element['#is_weight'] = TRUE;
 
   // If the number of options is small enough, use a select field.
-  $max_elements = variable_get('weight_select_max', BACKDROP_WEIGHT_SELECT_MAX);
-  if ($element['#delta'] <= $max_elements) {
+  if ($element['#delta'] <= BACKDROP_WEIGHT_SELECT_MAX) {
     $element['#type'] = 'select';
     for ($n = (-1 * $element['#delta']); $n <= $element['#delta']; $n++) {
       $weights[$n] = $n;

@@ -875,7 +875,7 @@ function views_invalidate_cache() {
   cache_clear_all();
 
   // Set the menu as needed to be rebuilt.
-  variable_set('menu_rebuild_needed', TRUE);
+  state_set('menu_rebuild_needed', TRUE);
 
   // Allow modules to respond to the Views cache being cleared.
   module_invoke_all('views_invalidate_cache');
@@ -948,8 +948,8 @@ function views_check_perm($perm, $account = NULL) {
 function views_check_roles($rids, $account = NULL) {
   global $user;
   $account = isset($account) ? $account : $user;
-  $roles = array_keys($account->roles);
-  $roles[] = $account->uid ? BACKDROP_AUTHENTICATED_RID : BACKDROP_ANONYMOUS_RID;
+  $roles = $account->roles;
+  $roles[] = $account->uid ? BACKDROP_AUTHENTICATED_ROLE : BACKDROP_ANONYMOUS_ROLE;
   return user_access('access all views', $account) || array_intersect(array_filter($rids), $roles);
 }
 // ------------------------------------------------------------------
@@ -1189,8 +1189,7 @@ function views_get_handler($table, $field, $key, $override = NULL) {
     return $handler;
   }
 
-  // Identify missing handlers
-  backdrop_set_message(t("Missing handler: @table @field @key", array('@table' => $table, '@field' => $field, '@key' => $key)), 'error');
+  // Return missing handlers as broken.
   $broken = array(
     'title' => t('Broken handler @table.@field', array('@table' => $table, '@field' => $field)),
     'handler' => 'views_handler_' . $key . '_broken',
@@ -1593,15 +1592,6 @@ function views_form_views_form($form, &$form_state, $view, $output) {
       $method_form_element_row_id_exists = TRUE;
     }
 
-    $form['actions'] = array(
-      '#type' => 'actions',
-      '#weight' => 100,
-    );
-    $form['actions']['submit'] = array(
-      '#type' => 'submit',
-      '#value' => t('Save'),
-    );
-
     // If the field provides a views form, allow it to modify the $form array.
     $has_form = FALSE;
     if (property_exists($field, 'views_form_callback')) {
@@ -1734,7 +1724,7 @@ function views_exposed_form($form, &$form_state) {
 
   $form['#info'] = array();
 
-  if (!variable_get('clean_url', FALSE)) {
+  if (!config_get('system.core', 'clean_url')) {
     $form['q'] = array(
       '#type' => 'hidden',
       '#value' => $view->get_url(),
@@ -1887,7 +1877,7 @@ function views_views_query_substitutions($view) {
     '***CURRENT_VERSION***' => BACKDROP_VERSION,
     '***CURRENT_TIME***' => REQUEST_TIME,
     '***CURRENT_LANGUAGE***' => $language_content->langcode,
-    '***DEFAULT_LANGUAGE***' => language_default('language')->langcode,
+    '***DEFAULT_LANGUAGE***' => language_default()->langcode,
   );
 }
 
@@ -2120,6 +2110,22 @@ function views_views_api() {
     'api' => views_api_version(),
     'path' => backdrop_get_path('module', 'views') . '/includes',
   );
+}
+
+/**
+ * Implements hook_config_info().
+ */
+function views_config_info() {
+  $prefixes['views.view'] = array(
+    'name_key' => 'name',
+    'label_key' => 'human_name',
+    'group' => t('Views'),
+  );
+  $prefixes['views.settings'] = array(
+    'label' => t('Views settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
 }
 
 /**

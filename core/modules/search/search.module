@@ -130,8 +130,8 @@ function search_block_view($delta = '') {
  */
 function search_preprocess_block(&$variables) {
   if ($variables['block']->module == 'search' && $variables['block']->delta == 'form') {
-    $variables['attributes_array']['role'] = 'search';
-    $variables['content_attributes_array']['class'][] = 'container-inline';
+    $variables['attributes']['role'] = 'search';
+    $variables['content_attributes']['class'][] = 'container-inline';
   }
 }
 
@@ -248,7 +248,7 @@ function search_get_info($all = FALSE) {
   }
 
   // Return only modules that are set to active in search settings.
-  return array_intersect_key($search_hooks, array_flip(config_get('search.settings', 'search_active_modules')));
+  return array_intersect_key($search_hooks, array_flip((array) config_get('search.settings', 'search_active_modules')));
 }
 
 /**

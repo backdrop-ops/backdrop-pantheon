@@ -239,7 +239,7 @@ class ViewsUIWizardTaggedWithTestCase extends ViewsUIWizardHelper {
     $this->node_type_without_tags = $this->backdropCreateContentType();
 
     // Create the vocabulary for the tag field.
-    $this->tag_vocabulary = entity_create('taxonomy_vocabulary', array(
+    $this->tag_vocabulary = new TaxonomyVocabulary(array(
       'name' => 'Views testing tags',
       'machine_name' => 'views_testing_tags',
     ));
@@ -556,7 +556,7 @@ class ViewsUIWizardMenuTestCase extends ViewsUIWizardHelper {
         break;
       }
     }
-    $this->assertTrue($found, t('Found a link to %path in the main menu', array('%path' => $view['page[path]'])));
+    $this->assertTrue($found, t('Found a link to %path in the primary navigation', array('%path' => $view['page[path]'])));
   }
 }
 
@@ -605,6 +605,7 @@ class ViewsUIWizardJumpMenuTestCase extends ViewsUIWizardHelper {
       $view['page[style][style_plugin]'] = 'jump_menu';
       $view['page[style][row_plugin]'] = 'fields';
       $this->backdropPost('admin/structure/views/add', $view, t('Save & exit'));
+      $this->backdropGet($view['page[path]']);
 
       // Submit the jump menu form, and check that we are redirected to the
       // expected URL.
@@ -669,7 +670,7 @@ class ViewsUIWizardJumpMenuTestCase extends ViewsUIWizardHelper {
    * Helper function to create a taxonomy term and return its expected path.
    */
   function createTaxonomyTermAndGetPath() {
-    $vocabulary = entity_create('taxonomy_vocabulary', array(
+    $vocabulary = new TaxonomyVocabulary(array(
       'name' => $this->randomName(),
       'machine_name' => backdrop_strtolower($this->randomName()),
     ));
@@ -677,7 +678,7 @@ class ViewsUIWizardJumpMenuTestCase extends ViewsUIWizardHelper {
 
     $term = entity_create('taxonomy_term', array(
       'name' => $this->randomName(),
-      'vid' => $vocabulary->vid,
+      'vocabulary' => $vocabulary->machine_name,
     ));
     taxonomy_term_save($term);
 

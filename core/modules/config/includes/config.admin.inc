@@ -110,7 +110,7 @@ function config_sync_form(array $form, array &$form_state) {
  * Submit handler for config_sync_form().
  */
 function config_sync_form_submit(array &$form, array &$form_state) {
-  $last_sync_time = variable_get('config_sync');
+  $last_sync_time = state_get('config_sync');
   if ($last_sync_time == NULL || $last_sync_time < REQUEST_TIME - 120) {
     module_load_include('inc', 'config', 'includes/config.sync');
     $config_sync_batch = config_sync_batch($form_state['config_statuses']);
@@ -247,18 +247,16 @@ function config_import_full_form_submit(array &$form, array &$form_state) {
 
     // Convert the file URI to a file path that is readable by ArchiverTar.
     $file = file_load($fid);
-    $stream_wrapper = file_stream_wrapper_get_instance_by_scheme('temporary');
-    $directory = $stream_wrapper->getDirectoryPath();
-    $file_path = str_replace('temporary://', $directory . '/', $file->uri);
+    $realpath = backdrop_realpath($file->uri);
 
     try {
-      $archiver = new ArchiverTar($file_path);
+      $archiver = new ArchiverTar($realpath);
       $archiver->extract($config_dir, $archiver->listContents());
     }
     catch (\Exception $e) {
       form_set_error('import_tarball', t('Could not extract the contents of the tar file. The error message is "@message".', array('@message' => $e->getMessage())));
     }
-    file_delete($file, TRUE);
+    file_delete($file->fid);
 
     // Compare the files to see if any config actually differs.
     $config_statuses = array_filter(config_get_statuses());
@@ -267,7 +265,7 @@ function config_import_full_form_submit(array &$form, array &$form_state) {
       backdrop_set_message(t('The uploaded configuration matches the current site configuration exactly. No changes were made.'), 'warning');
     }
     else {
-      backdrop_set_message(t('Your configuration files were successfully uploaded. You may view the differences below and import using the "Import all" button.'));
+      backdrop_set_message(t('Your configuration files were successfully uploaded. You may view the differences below. Import into your site by using the "Import all" button.'));
       $form_state['redirect'] = 'admin/config/development/configuration';
     }
   }
@@ -278,15 +276,18 @@ function config_import_full_form_submit(array &$form, array &$form_state) {
  */
 function config_export_single_form(array $form, array &$form_state, $config_group = NULL, $config_name = NULL) {
   $form_state['config_groups'] = config_get_prefix_groups();
+  $form['#attached']['css'][] = backdrop_get_path('module', 'config') . '/css/config.admin.css';
 
   $form['description'] = array(
     '#markup' => '<p>' . t('This form may be used to export a single configuration so that it may be imported on a different site. Select a configuration group and name to generate configuration for copy/paste.') . '</p>',
   );
 
+  $group_options = backdrop_map_assoc(array_keys($form_state['config_groups']));
+  natsort($group_options);
   $form['config_group'] = array(
     '#title' => t('Configuration group'),
     '#type' => 'select',
-    '#options' => backdrop_map_assoc(array_keys($form_state['config_groups'])),
+    '#options' => $group_options,
     '#default_value' => $config_group,
     '#required' => TRUE,
     '#ajax' => array(
@@ -296,10 +297,15 @@ function config_export_single_form(array $form, array &$form_state, $config_grou
   );
 
   $default_type = isset($form_state['values']['config_group']) ? $form_state['values']['config_group'] : $config_group;
+  $config_names = array();
+  if ($default_type) {
+    $config_names = $form_state['config_groups'][$default_type];
+    natsort($config_names);
+  }
   $form['config_name'] = array(
     '#title' => t('Configuration name'),
     '#type' => 'select',
-    '#options' => $default_type ? $form_state['config_groups'][$default_type] : array(),
+    '#options' => $config_names,
     '#default_value' => $config_name,
     '#required' => TRUE,
     '#prefix' => '<div id="edit-config-type-wrapper">',
@@ -373,7 +379,7 @@ function config_import_single_form(array $form, array &$form_state) {
   form_load_include($form_state, 'inc', 'config', 'includes/config.sync');
 
   $form['description'] = array(
-    '#markup' => '<p>' . t('This form imports a single configuration file from another site. To generate an export, visit the <a href="!export">single export</a> page.', array('!export' => 'admin/config/development/configuration/single/export')) . '</p>',
+    '#markup' => '<p>' . t('This form imports a single configuration file from another site. To generate an export, visit the <a href="!export">single export</a> page.', array('!export' => url('admin/config/development/configuration/single/export'))) . '</p>',
   );
   $form['import'] = array(
     '#title' => t('Paste your configuration here'),
@@ -449,6 +455,7 @@ function config_import_single_form_validate(array &$form, array &$form_state) {
 function config_import_single_form_submit(array &$form, array &$form_state) {
   $data = $form_state['config_data'];
   config_sync_file($data['_config_name'], $form_state['config_change_type'], $data);
+  backdrop_flush_all_caches();
   backdrop_set_message(t('The %name configuration was imported successfully.', array('%name' => $data['_config_name'])));
 }
 

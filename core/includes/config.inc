@@ -26,10 +26,11 @@
  */
 function config($config_file, $type = 'active') {
   // Use the advanced backdrop_static() pattern, since this is called very often.
-  static $loaded_configs;
-  if (!isset($loaded_configs)) {
-    $loaded_configs = &backdrop_static(__FUNCTION__, array());
+  static $backdrop_static_fast;
+  if (!isset($backdrop_static_fast)) {
+    $backdrop_static_fast['loaded_configs'] = &backdrop_static(__FUNCTION__);
   }
+  $loaded_configs = &$backdrop_static_fast['loaded_configs'];
 
   if (!isset($loaded_configs[$type][$config_file])) {
     $directory = config_get_config_directory($type);
@@ -150,6 +151,23 @@ function config_get_names_with_prefix($prefix, $type = 'active') {
 }
 
 /**
+ * Loads configuration objects by name.
+ *
+ * @param array $names
+ *   The list of configuration names to load.
+ * @param string $type
+ *   The configuration type, either "staging" or "active".
+ *
+ * @return array
+ *   An array containing matching configuration objects.
+ */
+function config_load_multiple($names, $type = 'active') {
+  $directory = config_get_config_directory($type);
+  $storage = new ConfigFileStorage($directory);
+  return $storage->readMultiple($names);
+}
+
+/**
  * Moves the default config supplied by a module to the live config directory.
  *
  * @param string $module
@@ -173,8 +191,31 @@ function config_install_default_config($module, $config_name = NULL) {
       if (is_null($config_name) || $file_config_name === $config_name) {
         $data = $storage->read($file_config_name);
         $config = config($file_config_name);
-        $config->setData($data);
-        $config->save();
+        // We only create new configs, and do not overwrite existing ones.
+        if ($config->isNew()) {
+          $config->setData($data);
+          $config->save();
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Uninstall all the configuration provided by a module.
+ */
+function config_uninstall_config($module, $config_name = NULL) {
+  backdrop_load('module', $module);
+  if ($configs = module_invoke($module, 'config_info')) {
+    foreach ($configs as $config_name => $config_info) {
+      if (isset($config_info['name_key'])) {
+        $sub_names = config_get_names_with_prefix($config_name . '.');
+        foreach ($sub_names as $sub_name) {
+          config($sub_name)->delete();
+        }
+      }
+      else {
+        config($config_name)->delete();
       }
     }
   }
@@ -599,10 +640,11 @@ class Config {
     $this->isNew = FALSE;
 
     // Empty static caches of this config file.
-    $static = &backdrop_static('config', array());
-    foreach ($static as $type => $configs) {
-      if (array_key_exists($this->name, $configs)) {
-        unset($static[$type][$this->name]);
+    if ($static = &backdrop_static('config')) {
+      foreach ($static as $type => $configs) {
+        if (array_key_exists($this->name, $configs)) {
+          unset($static[$type][$this->name]);
+        }
       }
     }
 
@@ -878,10 +920,12 @@ class ConfigFileStorage implements ConfigStorageInterface {
     // Ensure that the config name is included in the written file.
     $data = array_merge(array('_config_name' => $name), $data);
     $data = $this->encode($data) . "\n";
-    $status = @file_put_contents($this->getFilePath($name), $data);
+    $file_path = $this->getFilePath($name);
+    $status = @file_put_contents($file_path, $data);
     if ($status === FALSE) {
       throw new ConfigStorageException('Failed to write configuration file: ' . $this->getFilePath($name));
     }
+    clearstatcache(FALSE, $file_path);
     return TRUE;
   }
 
@@ -895,7 +939,10 @@ class ConfigFileStorage implements ConfigStorageInterface {
       }
       return FALSE;
     }
-    return backdrop_unlink($this->getFilePath($name));
+    $file_path = $this->getFilePath($name);
+    $status = backdrop_unlink($file_path);
+    clearstatcache(FALSE, $file_path);
+    return $status;
   }
 
   /**

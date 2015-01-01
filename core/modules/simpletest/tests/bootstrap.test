@@ -103,6 +103,7 @@ class BootstrapPageCacheTestCase extends BackdropWebTestCase {
    */
   function testConditionalRequests() {
     config_set('system.core', 'cache', 1);
+    config_set('system.core', 'page_cache_maximum_age', 300);
 
     // Fill the cache.
     $this->backdropGet('');
@@ -141,12 +142,13 @@ class BootstrapPageCacheTestCase extends BackdropWebTestCase {
    */
   function testPageCache() {
     config_set('system.core', 'cache', 1);
+    config_set('system.core', 'page_cache_maximum_age', 300);
 
     // Fill the cache.
     $this->backdropGet('system-test/set-header', array('query' => array('name' => 'Foo', 'value' => 'bar')));
     $this->assertEqual($this->backdropGetHeader('X-Backdrop-Cache'), 'MISS', 'Page was not cached.');
     $this->assertEqual($this->backdropGetHeader('Vary'), 'Cookie,Accept-Encoding', 'Vary header was sent.');
-    $this->assertEqual($this->backdropGetHeader('Cache-Control'), 'public, max-age=0', 'Cache-Control header was sent.');
+    $this->assertEqual($this->backdropGetHeader('Cache-Control'), 'public, max-age=300', 'Cache-Control header was sent.');
     $this->assertEqual($this->backdropGetHeader('Expires'), 'Sun, 19 Nov 1978 05:00:00 GMT', 'Expires header was sent.');
     $this->assertEqual($this->backdropGetHeader('Foo'), 'bar', 'Custom header was sent.');
 
@@ -154,7 +156,7 @@ class BootstrapPageCacheTestCase extends BackdropWebTestCase {
     $this->backdropGet('system-test/set-header', array('query' => array('name' => 'Foo', 'value' => 'bar')));
     $this->assertEqual($this->backdropGetHeader('X-Backdrop-Cache'), 'HIT', 'Page was cached.');
     $this->assertEqual($this->backdropGetHeader('Vary'), 'Cookie,Accept-Encoding', 'Vary: Cookie header was sent.');
-    $this->assertEqual($this->backdropGetHeader('Cache-Control'), 'public, max-age=0', 'Cache-Control header was sent.');
+    $this->assertEqual($this->backdropGetHeader('Cache-Control'), 'public, max-age=300', 'Cache-Control header was sent.');
     $this->assertEqual($this->backdropGetHeader('Expires'), 'Sun, 19 Nov 1978 05:00:00 GMT', 'Expires header was sent.');
     $this->assertEqual($this->backdropGetHeader('Foo'), 'bar', 'Custom header was sent.');
 
@@ -185,6 +187,7 @@ class BootstrapPageCacheTestCase extends BackdropWebTestCase {
    */
   function testPageCompression() {
     config_set('system.core', 'cache', 1);
+    config_set('system.core', 'page_cache_maximum_age', 300);
 
     // Fill the cache and verify that output is compressed.
     $this->backdropGet('', array(), array('Accept-Encoding: gzip,deflate'));
@@ -251,10 +254,10 @@ class BootstrapVariableTestCase extends BackdropWebTestCase {
    */
   function testVariableDefaults() {
     // Tests passing nothing through to the default.
-    $this->assertIdentical(NULL, variable_get('simpletest_bootstrap_variable_test'), 'Variables are correctly defaulting to NULL.');
+    $this->assertIdentical(NULL, state_get('simpletest_bootstrap_variable_test'), 'Variables are correctly defaulting to NULL.');
 
     // Tests passing 5 to the default parameter.
-    $this->assertIdentical(5, variable_get('simpletest_bootstrap_variable_test', 5), 'The default variable parameter is passed through correctly.');
+    $this->assertIdentical(5, state_get('simpletest_bootstrap_variable_test', 5), 'The default variable parameter is passed through correctly.');
   }
 
 }
@@ -273,6 +276,7 @@ class HookBootExitTestCase extends BackdropWebTestCase {
   function testHookBootExit() {
     // Test with cache disabled. Boot and exit should always fire.
     config_set('system.core', 'cache', 0);
+
     $this->backdropGet('');
     $calls = 1;
     $this->assertEqual(db_query('SELECT COUNT(*) FROM {watchdog} WHERE type = :type AND message = :message', array(':type' => 'system_test', ':message' => 'hook_boot'))->fetchField(), $calls, t('hook_boot called with disabled cache.'));
@@ -280,17 +284,12 @@ class HookBootExitTestCase extends BackdropWebTestCase {
 
     // Test with normal cache. Boot and exit should be called.
     config_set('system.core', 'cache', 1);
+    config_set('system.core', 'page_cache_maximum_age', 300);
+
     $this->backdropGet('');
     $calls++;
     $this->assertEqual(db_query('SELECT COUNT(*) FROM {watchdog} WHERE type = :type AND message = :message', array(':type' => 'system_test', ':message' => 'hook_boot'))->fetchField(), $calls, t('hook_boot called with normal cache.'));
     $this->assertEqual(db_query('SELECT COUNT(*) FROM {watchdog} WHERE type = :type AND message = :message', array(':type' => 'system_test', ':message' => 'hook_exit'))->fetchField(), $calls, t('hook_exit called with normal cache.'));
-
-    // Boot and exit should not fire since the page is cached.
-    variable_set('page_cache_invoke_hooks', FALSE);
-    $this->assertTrue(cache('page')->get(url('', array('absolute' => TRUE))), t('Page has been cached.'));
-    $this->backdropGet('');
-    $this->assertEqual(db_query('SELECT COUNT(*) FROM {watchdog} WHERE type = :type AND message = :message', array(':type' => 'system_test', ':message' => 'hook_boot'))->fetchField(), $calls, t('hook_boot not called with aggressive cache and a cached page.'));
-    $this->assertEqual(db_query('SELECT COUNT(*) FROM {watchdog} WHERE type = :type AND message = :message', array(':type' => 'system_test', ':message' => 'hook_exit'))->fetchField(), $calls, t('hook_exit not called with aggressive cache and a cached page.'));
 
     // Test with page cache cleared, boot and exit should be called.
     $this->assertTrue(db_delete('cache_page')->execute(), t('Page cache cleared.'));
@@ -440,6 +439,28 @@ class BootstrapOverrideServerVariablesTestCase extends BackdropUnitTestCase {
       }
       // Restore the original value of $_SERVER.
       $_SERVER = $original_server;
+    }
+  }
+
+  /**
+   * Test that settings.php variables can be overridden by the server.
+   */
+  function testBackdropSettingsOverride() {
+    // This test only works on Travis CI through the SetEnv call in
+    // core/misc/travis-ci/vhost.conf. See backdrop_settings_initialize().
+    if (isset($_SERVER['BACKDROP_SETTINGS'])) {
+      $this->assertEqual(settings_get('test_setting'), 'foo', 'Custom setting set through the server environment variables in BACKDROP_SETTINGS.');
+
+      $test_database_array = array(
+        'default' => array(
+          'driver' => 'mysql',
+          'database' => 'test_database',
+          'username' => 'test_username',
+          'password' => 'test_password',
+          'host' => 'test_host',
+        )
+      );
+      $this->assertEqual($GLOBALS['databases']['test_database'], $test_database_array, 'Custom database set through the server environment variables in BACKDROP_SETTINGS.');
     }
   }
 

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * API for the Backdrop menu system.
@@ -316,7 +315,7 @@ function menu_get_ancestors($parts) {
   $ancestors = array();
   $length =  $number_parts - 1;
   $end = (1 << $number_parts) - 1;
-  $masks = variable_get('menu_masks');
+  $masks = state_get('menu_masks');
   // If the optimized menu_masks array is not available use brute force to get
   // the correct $ancestors and $placeholders returned. Do not use this as the
   // default value of the menu_masks variable to avoid building such a big
@@ -449,7 +448,7 @@ function menu_get_item($path = NULL, $router_item = NULL) {
   if (!isset($router_items[$path])) {
     // Rebuild if we know it's needed, or if the menu masks are missing which
     // occurs rarely, likely due to a race condition of multiple rebuilds.
-    if (variable_get('menu_rebuild_needed', FALSE) || !variable_get('menu_masks', array())) {
+    if (state_get('menu_rebuild_needed', FALSE) || !state_get('menu_masks', array())) {
       menu_rebuild();
     }
     $original_map = arg(NULL, $path);
@@ -1144,7 +1143,7 @@ function menu_tree_all_data($menu_name, $link = NULL, $max_depth = NULL) {
   // Use $mlid as a flag for whether the data being loaded is for the whole tree.
   $mlid = isset($link['mlid']) ? $link['mlid'] : 0;
   // Generate a cache ID (cid) specific for this $menu_name, $link, $language, and depth.
-  $cid = 'links:' . $menu_name . ':all:' . $mlid . ':' . $GLOBALS['language_interface']->langcode . ':' . (int) $max_depth;
+  $cid = 'links:' . $menu_name . ':all:' . $mlid . ':' . $GLOBALS['language']->langcode . ':' . (int) $max_depth;
 
   if (!isset($tree[$cid])) {
     // If the static variable doesn't have the data, check {cache_menu}.
@@ -1258,14 +1257,11 @@ function menu_tree_page_data($menu_name, $max_depth = NULL, $only_active_trail =
       $max_depth = min($max_depth, MENU_MAX_DEPTH);
     }
     // Generate a cache ID (cid) specific for this page.
-    $cid = 'links:' . $menu_name . ':page:' . $item['href'] . ':' . $GLOBALS['language_interface']->langcode . ':' . (int) $item['access'] . ':' . (int) $max_depth;
-    // If we are asked for the active trail only, and $menu_name has not been
-    // built and cached for this page yet, then this likely means that it
-    // won't be built anymore, as this function is invoked from
-    // template_process_page(). So in order to not build a giant menu tree
-    // that needs to be checked for access on all levels, we simply check
-    // whether we have the menu already in cache, or otherwise, build a minimum
-    // tree containing the breadcrumb/active trail only.
+    $cid = 'links:' . $menu_name . ':page:' . $item['href'] . ':' . $GLOBALS['language']->langcode . ':' . (int) $item['access'] . ':' . (int) $max_depth;
+    // In order to not build a giant menu tree that needs to be checked for
+    // access on all levels, we simply check whether we have the menu already
+    // in cache, or otherwise, build a minimum tree containing the
+    // breadcrumb/active trail only.
     // @see menu_set_active_trail()
     if (!isset($tree[$cid]) && $only_active_trail) {
       $cid .= ':trail';
@@ -1410,7 +1406,7 @@ function _menu_build_tree($menu_name, array $parameters = array()) {
   if (isset($parameters['expanded'])) {
     sort($parameters['expanded']);
   }
-  $tree_cid = 'links:' . $menu_name . ':tree-data:' . $GLOBALS['language_interface']->langcode . ':' . hash('sha256', serialize($parameters));
+  $tree_cid = 'links:' . $menu_name . ':tree-data:' . $GLOBALS['language']->langcode . ':' . hash('sha256', serialize($parameters));
 
   // If we do not have this tree in the static cache, check {cache_menu}.
   if (!isset($trees[$tree_cid])) {
@@ -1791,9 +1787,9 @@ function menu_set_custom_theme() {
  */
 function menu_list_system_menus() {
   return array(
-    'main-menu' => 'Main menu',
-    'management' => 'Management',
-    'user-menu' => 'User menu',
+    'main-menu' => 'Primary navigation',
+    'management' => 'Administration menu',
+    'user-menu' => 'Account menu',
   );
 }
 
@@ -2720,7 +2716,7 @@ function menu_rebuild() {
     menu_cache_clear_all();
     _menu_clear_page_cache();
     // Indicate that the menu has been successfully rebuilt.
-    variable_del('menu_rebuild_needed');
+    state_del('menu_rebuild_needed');
   }
   catch (Exception $e) {
     $transaction->rollback();
@@ -3831,7 +3827,7 @@ function _menu_router_save($menu, $masks) {
   // Insert any remaining records.
   $insert->execute();
   // Store the masks.
-  variable_set('menu_masks', $masks);
+  state_set('menu_masks', $masks);
 
   return $menu;
 }

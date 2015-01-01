@@ -67,7 +67,7 @@ function _translation_tab_access($node) {
  * Implements hook_admin_paths().
  */
 function translation_admin_paths() {
-  if (variable_get('node_admin_theme')) {
+  if (config_get('system.core', 'node_admin_theme')) {
     $paths = array(
       'node/*/translate' => TRUE,
     );
@@ -84,6 +84,17 @@ function translation_permission() {
       'title' => t('Translate content'),
     ),
   );
+}
+
+/**
+ * Implements hook_config_info().
+ */
+function translation_config_info() {
+  $prefixes['translation.settings'] = array(
+    'label' => t('Translation settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
 }
 
 /**
@@ -228,8 +239,8 @@ function translation_node_view(Node $node, $view_mode) {
     // content translation links. As custom language switch links are available
     // only for configurable language types and interface language is the only
     // configurable language type in core, we use it as default. Contributed
-    // modules can change this behavior by setting the system variable below.
-    $type = variable_get('translation_language_type', LANGUAGE_TYPE_INTERFACE);
+    // modules can change this behavior by setting the config option below.
+    $type = config_get('translation.settings', 'language_type');
     $custom_links = language_negotiation_get_switch_links($type, "node/$node->nid");
     $links = array();
 
@@ -486,7 +497,8 @@ function translation_node_get_translations($tnid) {
  *   TRUE if translation is supported, and FALSE if not.
  */
 function translation_supported_type($type) {
-  return variable_get('node_type_language_' . $type, 0) == TRANSLATION_ENABLED;
+  $node_type = node_type_get_type($type);
+  return $node_type->settings['node_type_language'] == TRANSLATION_ENABLED;
 }
 
 /**
@@ -515,7 +527,7 @@ function translation_path_get_translations($path) {
  * Replaces links with pointers to translated versions of the content.
  */
 function translation_language_switch_links_alter(array &$links, $type, $path) {
-  $language_type = variable_get('translation_language_type', LANGUAGE_TYPE_INTERFACE);
+  $language_type = config_get('translation.settings', 'language_type');
 
   if ($type == $language_type && preg_match("!^node/(\d+)(/.+|)!", $path, $matches)) {
     $node = node_load((int) $matches[1]);

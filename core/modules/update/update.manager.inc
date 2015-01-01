@@ -60,7 +60,17 @@
  * @ingroup forms
  */
 function update_manager_update_form($form, $form_state = array(), $context) {
-  backdrop_set_title('Update modules');
+  switch ($context) {
+    case 'module':
+      backdrop_set_title('Update modules');
+      break;
+    case 'theme':
+      backdrop_set_title('Update themes');
+      break;
+    case 'report':
+      backdrop_set_title('Update modules & themes');
+      break;
+  }
 
   if (!_update_manager_check_backends($form, 'update')) {
     return $form;
@@ -206,7 +216,7 @@ function update_manager_update_form($form, $form_state = array(), $context) {
 
   if (empty($projects)) {
     $form['message'] = array(
-      '#markup' => t('All of your projects are up to date.'),
+      '#markup' => '<p>' . t('No updates are available for any of your projects.') . '</p>',
     );
     return $form;
   }
@@ -277,7 +287,7 @@ function update_manager_update_form($form, $form_state = array(), $context) {
  */
 function theme_update_manager_update_form($variables) {
   $form = $variables['form'];
-  $last = variable_get('update_last_check', 0);
+  $last = state_get('update_last_check', 0);
   $output = theme('update_last_check', array('last' => $last));
   $output .= backdrop_render_children($form);
   return $output;

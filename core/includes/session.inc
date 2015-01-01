@@ -79,7 +79,7 @@ function _backdrop_session_read($sid) {
   // Handle the case of first time visitors and clients that don't store
   // cookies (eg. web crawlers).
   $insecure_session_name = substr(session_name(), 1);
-  if (!isset($_COOKIE[session_name()]) && !isset($_COOKIE[$insecure_session_name])) {
+  if (empty($sid) || (!isset($_COOKIE[session_name()]) && !isset($_COOKIE[$insecure_session_name]))) {
     $user = backdrop_anonymous_user();
     return '';
   }
@@ -109,9 +109,8 @@ function _backdrop_session_read($sid) {
     $user->data = unserialize($user->data);
 
     // Add roles element to $user.
-    $user->roles = array();
-    $user->roles[BACKDROP_AUTHENTICATED_RID] = 'authenticated user';
-    $user->roles += db_query("SELECT r.rid, r.name FROM {role} r INNER JOIN {users_roles} ur ON ur.rid = r.rid WHERE ur.uid = :uid", array(':uid' => $user->uid))->fetchAllKeyed(0, 1);
+    $user->roles = db_query("SELECT role FROM {users_roles} WHERE uid = :uid", array(':uid' => $user->uid))->fetchCol();
+    array_unshift($user->roles, BACKDROP_AUTHENTICATED_ROLE);
   }
   elseif ($user) {
     // The user is anonymous or blocked. Only preserve two fields from the
@@ -172,11 +171,10 @@ function _backdrop_session_write($sid, $value) {
 
     // For performance reasons, do not update the sessions table, unless
     // $_SESSION has changed or more than 180 has passed since the last update.
-    if ($is_changed || !isset($user->timestamp) || REQUEST_TIME - $user->timestamp > variable_get('session_write_interval', 180)) {
+    if ($is_changed || !isset($user->timestamp) || REQUEST_TIME - $user->timestamp > settings_get('session_write_interval', 180)) {
       // Either ssid or sid or both will be added from $key below.
       $fields = array(
         'uid' => $user->uid,
-        'cache' => isset($user->cache) ? $user->cache : 0,
         'hostname' => ip_address(),
         'session' => $value,
         'timestamp' => REQUEST_TIME,
@@ -210,7 +208,7 @@ function _backdrop_session_write($sid, $value) {
     }
 
     // Likewise, do not update access time more than once per 180 seconds.
-    if ($user->uid && REQUEST_TIME - $user->access > variable_get('session_write_interval', 180)) {
+    if ($user->uid && REQUEST_TIME - $user->access > settings_get('session_write_interval', 180)) {
       db_update('users')
         ->fields(array(
           'access' => REQUEST_TIME

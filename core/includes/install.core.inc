@@ -422,7 +422,7 @@ function install_run_task($task, &$install_state) {
   elseif ($task['type'] == 'batch') {
     // Start a new batch based on the task function, if one is not running
     // already.
-    $current_batch = variable_get('install_current_batch');
+    $current_batch = state_get('install_current_batch');
     if (!$install_state['interactive'] || !$current_batch) {
       $batch = $function($install_state);
       if (empty($batch)) {
@@ -435,7 +435,7 @@ function install_run_task($task, &$install_state) {
       // task is currently running. Otherwise, we need to make sure the batch
       // will complete in one page request.
       if ($install_state['interactive']) {
-        variable_set('install_current_batch', $function);
+        state_set('install_current_batch', $function);
       }
       else {
         $batch =& batch_get();
@@ -455,7 +455,7 @@ function install_run_task($task, &$install_state) {
       // longer requesting a batch ID.
       if ($output === FALSE) {
         // Return nothing so the next task will run in the same request.
-        variable_del('install_current_batch');
+        state_del('install_current_batch');
         return;
       }
       else {
@@ -800,14 +800,14 @@ function install_system_module(&$install_state) {
   module_enable(array('entity', 'user'), FALSE);
 
   // Save the list of other modules to install for the upcoming tasks.
-  // variable_set() can be used now that system.module is installed.
+  // state_set() can be used now that system.module is installed.
   $modules = $install_state['profile_info']['dependencies'];
 
   // The installation profile is also a module, which needs to be installed
   // after all the dependencies have been installed.
   $modules[] = backdrop_get_profile();
 
-  variable_set('install_profile_modules', array_diff($modules, array('system')));
+  state_set('install_profile_modules', array_diff($modules, array('system')));
   $install_state['database_tables_exist'] = TRUE;
 }
 
@@ -1204,11 +1204,6 @@ function install_find_translations() {
   foreach ($files as $key => $file) {
     // Strip off the file name component before the language code.
     $files[$key]->langcode = preg_replace('!^(.+\.)?([^\.]+)$!', '\2', $file->name);
-    // Language codes cannot exceed 12 characters to fit into the {language}
-    // table.
-    if (strlen($files[$key]->langcode) > 12) {
-      unset($files[$key]);
-    }
   }
   return $files;
 }
@@ -1228,7 +1223,7 @@ function install_find_translations() {
  * @see file_scan_directory()
  */
 function install_find_translation_files($langcode = NULL) {
-  $directory = variable_get('locale_translate_file_directory', 'files/translations');
+  $directory = settings_get('locale_translate_file_directory', 'files/translations');
   $files = file_scan_directory($directory, '!install\.' . (!empty($langcode) ? preg_quote($langcode, '!') : '[^\.]+') . '\.po$!', array('recurse' => FALSE));
   return $files;
 }
@@ -1268,7 +1263,7 @@ function install_select_language(&$install_state) {
     // is doing.
     if (count($files) == 1) {
       if ($install_state['interactive']) {
-        $directory = variable_get('locale_translate_file_directory', 'files/translations');
+        $directory = settings_get('locale_translate_file_directory', 'files/translations');
 
         backdrop_set_title(st('Choose language'));
         if (!empty($install_state['parameters']['translate'])) {
@@ -1423,9 +1418,9 @@ function install_bootstrap_full(&$install_state) {
  *   The batch definition.
  */
 function install_profile_modules(&$install_state) {
-  $modules = variable_get('install_profile_modules', array());
+  $modules = state_get('install_profile_modules', array());
   $files = system_rebuild_module_data();
-  variable_del('install_profile_modules');
+  state_del('install_profile_modules');
 
   // Always install required modules first. Respect the dependencies between
   // the modules.
@@ -1580,7 +1575,7 @@ function install_finished(&$install_state) {
   backdrop_flush_all_caches();
 
   // Remember the profile which was used.
-  variable_set('install_profile', backdrop_get_profile());
+  config_set('system.core', 'install_profile', backdrop_get_profile());
 
   // Installation profiles are always loaded last
   db_update('system')
@@ -1598,12 +1593,6 @@ function install_finished(&$install_state) {
   backdrop_cron_run();
 
   $message = '<strong>' . st('Congratulations, you installed @profile!', array('@profile' => backdrop_install_profile_distribution_name())) . '</strong>';
-
-  // Warn about settings.php permissions risk.
-  $settings_file = conf_path() . '/settings.php';
-  if (backdrop_verify_install_file($settings_file, FILE_WRITABLE)) {
-    $message .= ' ' . st('Now that installation is complete, you should remove write permissions to the settings.php file. See the site <a href="!status-report">status report</a> for more information.', array('%file' => $settings_file, '!status-report' => url('admin/reports/status')));
-  }
 
   backdrop_set_message($message);
   backdrop_goto('<front>');
@@ -1859,7 +1848,8 @@ function install_configure_form_submit($form, &$form_state) {
   user_login_finalize();
 
   if (isset($form_state['values']['clean_url'])) {
-    variable_set('clean_url', $form_state['values']['clean_url']);
+    config_set('system.core', 'clean_url', $form_state['values']['clean_url']);
+    backdrop_static_reset('url');
   }
 
   // Record when this install ran.

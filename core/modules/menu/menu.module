@@ -148,6 +148,22 @@ function menu_theme() {
 }
 
 /**
+ * Implements hook_config_info().
+ */
+function menu_config_info() {
+  $prefixes['menu.settings'] = array(
+    'label' => t('Menu settings'),
+    'group' => t('Configuration'),
+  );
+  $prefixes['menu.menu'] = array(
+    'name_key' => 'menu_name',
+    'label_key' => 'title',
+    'group' => t('Menus'),
+  );
+  return $prefixes;
+}
+
+/**
  * Implements hook_enable().
  *
  * Add a link for each custom menu.
@@ -157,8 +173,8 @@ function menu_enable() {
   $base_link = db_query("SELECT mlid AS plid, menu_name FROM {menu_links} WHERE link_path = 'admin/structure/menu' AND module = 'system'")->fetchAssoc();
   $base_link['router_path'] = 'admin/structure/menu/manage/%';
   $base_link['module'] = 'menu';
-  $result = db_query("SELECT * FROM {menu_custom}", array(), array('fetch' => PDO::FETCH_ASSOC));
-  foreach ($result as $menu) {
+  $menus = menu_load_all();
+  foreach ($menus as $menu) {
     // $link is passed by reference to menu_link_save(), so we make a copy of $base_link.
     $link = $base_link;
     $link['mlid'] = 0;
@@ -205,12 +221,16 @@ function menu_load($menu_name) {
 function menu_load_all() {
   $custom_menus = &backdrop_static(__FUNCTION__);
   if (!isset($custom_menus)) {
-    if ($cached = cache('menu')->get('menu_custom')) {
+    if ($cached = cache('menu')->get('menu_configs')) {
       $custom_menus = $cached->data;
     }
     else {
-      $custom_menus = db_query('SELECT * FROM {menu_custom}')->fetchAllAssoc('menu_name', PDO::FETCH_ASSOC);
-      cache('menu')->set('menu_custom', $custom_menus);
+      $config_names = config_get_names_with_prefix('menu.menu.');
+      foreach ($config_names as $config_name) {
+        $menu = config_get($config_name);
+        $custom_menus[$menu['menu_name']] = $menu;
+      }
+      cache('menu')->set('menu_configs', $custom_menus);
     }
   }
   return $custom_menus;
@@ -232,13 +252,18 @@ function menu_load_all() {
  * @see menu_load()
  */
 function menu_save($menu) {
-  $status = db_merge('menu_custom')
-    ->key(array('menu_name' => $menu['menu_name']))
-    ->fields(array(
-      'title' => $menu['title'],
-      'description' => $menu['description'],
-    ))
-    ->execute();
+  $menu_defaults = array(
+    'menu_name' => '',
+    'title' => '',
+    'description' => '',
+  );
+  $menu += $menu_defaults;
+  $menu = array_intersect_key($menu, $menu_defaults);
+
+  $config = config('menu.menu.' . $menu['menu_name']);
+  $status = $config->isNew() ? SAVED_NEW : SAVED_UPDATED;
+  $config->setData($menu);
+  $config->save();
   menu_cache_clear_all();
 
   switch ($status) {
@@ -303,9 +328,7 @@ function menu_delete($menu) {
   }
 
   // Delete the custom menu.
-  db_delete('menu_custom')
-    ->condition('menu_name', $menu['menu_name'])
-    ->execute();
+  config('menu.menu.' . $menu['menu_name'])->delete();
 
   menu_cache_clear_all();
   module_invoke_all('menu_delete', $menu);
@@ -325,19 +348,8 @@ function menu_delete($menu) {
  * @return
  *   An array of menu link titles keyed on the a string containing the menu name
  *   and mlid. The list excludes the given item and its children.
- *
- * @todo This has to be turned into a #process form element callback. The
- *   'menu_override_parent_selector' variable is entirely superfluous.
  */
 function menu_parent_options($menus, $item, $type = '') {
-  // The menu_links table can be practically any size and we need a way to
-  // allow contrib modules to provide more scalable pattern choosers.
-  // hook_form_alter is too late in itself because all the possible parents are
-  // retrieved here, unless menu_override_parent_selector is set to TRUE.
-  if (variable_get('menu_override_parent_selector', FALSE)) {
-    return array();
-  }
-
   $available_menus = array();
   if (!is_array($item)) {
     // If $item is not an array then it is a node type.
@@ -351,8 +363,8 @@ function menu_parent_options($menus, $item, $type = '') {
   }
   else {
     // If a node type is set, use all available menus for this type.
-    $type_menus = variable_get('menu_options_' . $type, array('main-menu' => 'main-menu'));
-    foreach ($type_menus as $menu) {
+    $node_type = node_type_load($type);
+    foreach ($node_type->settings['menu_options'] as $menu) {
       $available_menus[$menu] = $menu;
     }
   }
@@ -546,13 +558,15 @@ function menu_node_predelete(Node $node) {
  */
 function menu_node_prepare(Node $node) {
   if (empty($node->menu)) {
+    $node_type = node_type_load($node->type);
+
     // Prepare the node for the edit form so that $node->menu always exists.
-    $menu_name = strtok(variable_get('menu_parent_' . $node->type, 'main-menu:0'), ':');
+    $menu_name = strtok($node_type->settings['menu_parent'], ':');
     $item = array();
     if (isset($node->nid)) {
       $mlid = FALSE;
       // Give priority to the default menu
-      $type_menus = variable_get('menu_options_' . $node->type, array('main-menu' => 'main-menu'));
+      $type_menus = $node_type->settings['menu_options'];
       if (in_array($menu_name, $type_menus)) {
         $mlid = db_query_range("SELECT mlid FROM {menu_links} WHERE link_path = :path AND menu_name = :menu_name AND module = 'menu' ORDER BY mlid ASC", 0, 1, array(
           ':path' => 'node/' . $node->nid,
@@ -610,6 +624,8 @@ function menu_form_node_form_alter(&$form, $form_state) {
   // @todo This must be handled in a #process handler.
   $link = $form['#node']->menu;
   $type = $form['#node']->type;
+  $node_type = node_type_load($type);
+
   // menu_parent_options() is goofy and can actually handle either a menu link
   // or a node type both as second argument. Pick based on whether there is
   // a link already (menu_node_prepare() sets mlid default to 0).
@@ -630,7 +646,7 @@ function menu_form_node_form_alter(&$form, $form_state) {
       'js' => array(backdrop_get_path('module', 'menu') . '/menu.js'),
     ),
     '#tree' => TRUE,
-    '#weight' => -2,
+    '#weight' => 40,
     '#attributes' => array('class' => array('menu-link-form')),
   );
   $form['menu']['enabled'] = array(
@@ -667,7 +683,7 @@ function menu_form_node_form_alter(&$form, $form_state) {
     '#description' => t('Shown when hovering over the menu link.'),
   );
 
-  $default = ($link['mlid'] ? $link['menu_name'] . ':' . $link['plid'] : variable_get('menu_parent_' . $type, 'main-menu:0'));
+  $default = ($link['mlid'] ? $link['menu_name'] . ':' . $link['plid'] : $node_type->settings['menu_parent']);
   // If the current parent menu item is not present in options, use the first
   // available option as default value.
   // @todo User should not be allowed to access menu link settings in such a
@@ -712,7 +728,7 @@ function menu_node_submit(Node $node, $form, $form_state) {
  */
 function menu_form_node_type_form_alter(&$form, $form_state) {
   $menu_options = menu_get_menus();
-  $type = $form['#node_type'];
+  $node_type = $form['#node_type'];
   $form['menu'] = array(
     '#type' => 'fieldset',
     '#title' => t('Menu settings'),
@@ -726,7 +742,7 @@ function menu_form_node_type_form_alter(&$form, $form_state) {
   $form['menu']['menu_options'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Available menus'),
-    '#default_value' => variable_get('menu_options_' . $type->type, array('main-menu')),
+    '#default_value' => $node_type->settings['menu_options'],
     '#options' => $menu_options,
     '#description' => t('The menus available to place links in for this content type.'),
   );
@@ -738,7 +754,7 @@ function menu_form_node_type_form_alter(&$form, $form_state) {
   $form['menu']['menu_parent'] = array(
     '#type' => 'select',
     '#title' => t('Default parent item'),
-    '#default_value' => variable_get('menu_parent_' . $type->type, 'main-menu:0'),
+    '#default_value' => $node_type->settings['menu_parent'],
     '#options' => $options,
     '#description' => t('Choose the menu item to be the default parent for a new link in the content authoring form.'),
     '#attributes' => array('class' => array('menu-title-select')),
@@ -750,6 +766,18 @@ function menu_form_node_type_form_alter(&$form, $form_state) {
     '(function ($) { Backdrop.menu_update_parent_list(); })(jQuery);',
     array('scope' => 'footer', 'type' => 'inline')
   );
+}
+
+/**
+ * Implements hook_node_type_load()
+ */
+function menu_node_type_load(&$types) {
+  foreach ($types as $type_name => $type) {
+    $types[$type_name]->settings += array(
+      'menu_options' => array('main-menu'),
+      'menu_parent' => 'main-menu:0',
+    );
+  }
 }
 
 /**
@@ -780,17 +808,6 @@ function menu_get_menus($all = TRUE) {
  */
 function menu_preprocess_block(&$variables) {
   if ($variables['block']->module == 'menu') {
-    $variables['attributes_array']['role'] = 'navigation';
+    $variables['attributes']['role'] = 'navigation';
   }
-}
-
-/**
- * Implements hook_config_info().
- */
-function menu_config_info() {
-  $prefixes['menu.settings'] = array(
-    'label' => t('Menu settings'),
-    'group' => t('Configuration'),
-  );
-  return $prefixes;
 }

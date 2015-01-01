@@ -87,7 +87,7 @@ const JS_THEME = 100;
 /**
  * The default group for JavaScript settings added to the page.
  */
-const JS_SETTING = 200;
+const JS_SETTING = -200;
 
 /**
  * Error code indicating that the request exceeded the specified timeout.
@@ -217,9 +217,8 @@ function backdrop_get_region_content($region = NULL, $delimiter = ' ') {
  *
  * When this function is called during Backdrop's initial installation process,
  * the name of the profile that's about to be installed is stored in the global
- * installation state. At all other times, the standard Backdrop systems variable
- * table contains the name of the current profile, and we can call
- * variable_get() to determine what one is active.
+ * installation state. At all other times, the standard Backdrop system.core
+ * config file contains the name of the current profile.
  *
  * @return $profile
  *   The name of the installation profile.
@@ -231,7 +230,7 @@ function backdrop_get_profile() {
     $profile = $install_state['parameters']['profile'];
   }
   else {
-    $profile = variable_get('install_profile', 'standard');
+    $profile = config_get('system.core', 'install_profile');
   }
 
   return $profile;
@@ -984,7 +983,7 @@ function backdrop_http_request($url, array $options = array()) {
     // server's ability to make outgoing HTTP requests the next time that
     // requirements checking is performed.
     // See system_requirements().
-    variable_set('backdrop_http_request_fails', TRUE);
+    state_set('backdrop_http_request_fails', TRUE);
 
     return $result;
   }
@@ -1555,7 +1554,7 @@ function backdrop_strip_dangerous_protocols($uri) {
   static $allowed_protocols;
 
   if (!isset($allowed_protocols)) {
-    $allowed_protocols = array_flip(variable_get('filter_allowed_protocols', array('ftp', 'http', 'https', 'irc', 'mailto', 'news', 'nntp', 'rtsp', 'sftp', 'ssh', 'tel', 'telnet', 'webcal')));
+    $allowed_protocols = array_flip(settings_get('filter_allowed_protocols', array('ftp', 'http', 'https', 'irc', 'mailto', 'news', 'nntp', 'rtsp', 'sftp', 'ssh', 'tel', 'telnet', 'webcal')));
   }
 
   // Iteratively remove any invalid protocol found.
@@ -1756,6 +1755,7 @@ function _filter_xss_split($m, $store = FALSE) {
  */
 function _filter_xss_attributes($attr) {
   $attrarr = array();
+  $skip = FALSE;
   $mode = 0;
   $attrname = '';
 
@@ -2189,9 +2189,9 @@ function format_date($timestamp, $date_format_name = 'medium', $pattern = '', $t
   }
 
   // Use the interface langcode if none is set.
-  global $language_interface;
+  global $language;
   if (empty($langcode)) {
-    $langcode = isset($language_interface->langcode) ? $language_interface->langcode : LANGUAGE_SYSTEM;
+    $langcode = isset($language->langcode) ? $language->langcode : LANGUAGE_SYSTEM;
   }
 
   // Create a DateTime object from the timestamp.
@@ -2422,8 +2422,18 @@ function url($path = NULL, array $options = array()) {
   $base = $options['absolute'] ? $options['base_url'] . '/' : base_path();
   $prefix = empty($path) ? rtrim($options['prefix'], '/') : $options['prefix'];
 
+  // Cache the clean URLs setting, as url() is called very frequently.
+  static $backdrop_static_fast;
+  if (!isset($backdrop_static_fast)) {
+    $backdrop_static_fast['clean_url'] = &backdrop_static(__FUNCTION__);
+  }
+  $clean_url = &$backdrop_static_fast['clean_url'];
+  if (!isset($clean_url)) {
+    $clean_url = config_get('system.core', 'clean_url');
+  }
+
   // With Clean URLs.
-  if (!empty($GLOBALS['conf']['clean_url'])) {
+  if (!empty($clean_url)) {
     $path = backdrop_encode_path($prefix . $path);
     if ($options['query']) {
       return $base . $path . '?' . backdrop_http_build_query($options['query']) . $options['fragment'];
@@ -2735,8 +2745,8 @@ function backdrop_deliver_html_page($page_callback_result) {
   }
 
   // Send appropriate HTTP-Header for browsers and search engines.
-  global $language_interface;
-  backdrop_add_http_header('Content-Language', $language_interface->langcode);
+  global $language;
+  backdrop_add_http_header('Content-Language', $language->langcode);
 
   // Menu status constants are integers; page content is a string or array.
   if (is_int($page_callback_result)) {
@@ -2792,7 +2802,7 @@ function backdrop_deliver_html_page($page_callback_result) {
         backdrop_maintenance_theme();
         backdrop_add_http_header('Status', '503 Service unavailable');
         backdrop_set_title(t('Site under maintenance'));
-        print theme('maintenance_page', array('content' => filter_xss_admin(t(config_get('system.core', 'maintenance_message'), array('@site' => config_get('system.core', 'site_name'))))));
+        print theme('maintenance_page', array('content' => filter_xss_admin(t(config_get('system.core', 'maintenance_mode_message'), array('@site' => config_get('system.core', 'site_name'))))));
         break;
     }
   }
@@ -3120,6 +3130,9 @@ function backdrop_add_css($data = NULL, $options = NULL) {
     // Always add a tiny value to the weight, to conserve the insertion order.
     $options['weight'] += count($css) / 1000;
 
+    // Add an every page weight for sorting.
+    $options['every_page_weight'] = $options['every_page'] ? -1 : 1;
+
     // Add the data to the CSS array depending on the type.
     switch ($options['type']) {
       case 'inline':
@@ -3173,7 +3186,7 @@ function backdrop_get_css($css = NULL, $skip_alter = FALSE) {
   }
 
   // Sort CSS items, so that they appear in the correct order.
-  uasort($css, 'backdrop_sort_css_js');
+  backdrop_sort($css, array('group', 'every_page_weight', 'weight'));
 
   // Provide the page with information about the individual CSS files used,
   // information not otherwise available when CSS aggregation is enabled. The
@@ -3211,59 +3224,6 @@ function backdrop_get_css($css = NULL, $skip_alter = FALSE) {
   }
 
   return backdrop_render($styles);
-}
-
-/**
- * Sorts CSS and JavaScript resources.
- *
- * Callback for uasort() within:
- * - backdrop_get_css()
- * - backdrop_get_js()
- *
- * This sort order helps optimize front-end performance while providing modules
- * and themes with the necessary control for ordering the CSS and JavaScript
- * appearing on a page.
- *
- * @param $a
- *   First item for comparison. The compared items should be associative arrays
- *   of member items from backdrop_add_css() or backdrop_add_js().
- * @param $b
- *   Second item for comparison.
- *
- * @see backdrop_add_css()
- * @see backdrop_add_js()
- */
-function backdrop_sort_css_js($a, $b) {
-  // First order by group, so that, for example, all items in the CSS_SYSTEM
-  // group appear before items in the CSS_DEFAULT group, which appear before
-  // all items in the CSS_THEME group. Modules may create additional groups by
-  // defining their own constants.
-  if ($a['group'] < $b['group']) {
-    return -1;
-  }
-  elseif ($a['group'] > $b['group']) {
-    return 1;
-  }
-  // Within a group, order all infrequently needed, page-specific files after
-  // common files needed throughout the website. Separating this way allows for
-  // the aggregate file generated for all of the common files to be reused
-  // across a site visit without being cut by a page using a less common file.
-  elseif ($a['every_page'] && !$b['every_page']) {
-    return -1;
-  }
-  elseif (!$a['every_page'] && $b['every_page']) {
-    return 1;
-  }
-  // Finally, order by weight.
-  elseif ($a['weight'] < $b['weight']) {
-    return -1;
-  }
-  elseif ($a['weight'] > $b['weight']) {
-    return 1;
-  }
-  else {
-    return 0;
-  }
 }
 
 /**
@@ -3654,7 +3614,7 @@ function backdrop_pre_render_styles($elements) {
 function backdrop_build_css_cache($css) {
   $data = '';
   $uri = '';
-  $map = variable_get('css_cache_files', array());
+  $map = state_get('css_cache_files', array());
   // Create a new array so that only the file names are used to create the hash.
   // This prevents new aggregates from being created unnecessarily.
   $css_data = array();
@@ -3711,14 +3671,14 @@ function backdrop_build_css_cache($css) {
     // that rewrite rules are working) and the zlib extension is available then
     // create a gzipped version of this file. This file is served conditionally
     // to browsers that accept gzip using .htaccess rules.
-    if (variable_get('css_gzip_compression', TRUE) && variable_get('clean_url', 0) && extension_loaded('zlib')) {
+    if (settings_get('css_gzip_compression', TRUE) && config_get('system.core', 'clean_url') && extension_loaded('zlib')) {
       if (!file_exists($uri . '.gz') && !file_unmanaged_save_data(gzencode($data, 9, FORCE_GZIP), $uri . '.gz', FILE_EXISTS_REPLACE)) {
         return FALSE;
       }
     }
     // Save the updated map.
     $map[$key] = $uri;
-    variable_set('css_cache_files', $map);
+    state_set('css_cache_files', $map);
   }
   return $uri;
 }
@@ -3889,7 +3849,7 @@ function _backdrop_load_stylesheet($matches) {
  * Deletes old cached CSS files.
  */
 function backdrop_clear_css_cache() {
-  variable_del('css_cache_files');
+  state_del('css_cache_files');
   file_scan_directory('public://css', '/.*/', array('callback' => 'backdrop_delete_file_if_stale'));
 }
 
@@ -3902,7 +3862,7 @@ function backdrop_clear_css_cache() {
  */
 function backdrop_delete_file_if_stale($uri) {
   // Default stale file threshold is 30 days.
-  if (REQUEST_TIME - filemtime($uri) > variable_get('stale_file_threshold', 2592000)) {
+  if (REQUEST_TIME - filemtime($uri) > settings_get('stale_file_threshold', 2592000)) {
     file_unmanaged_delete($uri);
   }
 }
@@ -4080,7 +4040,7 @@ function backdrop_html_id($id) {
  * drag-and-drop or dynamic Ajax loading, in a theme-independent way.
  *
  * @param $region
- *   The name of the page region (for example, 'page_top' or 'content').
+ *   The name of the page region (for example, 'page_bottom' or 'content').
  *
  * @return
  *   An HTML class that identifies the region (for example, 'region-page-top'
@@ -4264,6 +4224,9 @@ function backdrop_add_js($data = NULL, $options = NULL) {
   // order of the calls to backdrop_add_js().
   $options['weight'] += count($javascript) / 1000;
 
+  // Add an every page weight for sorting.
+  $options['every_page_weight'] = $options['every_page'] ? -1 : 1;
+
   if (isset($data)) {
     // Add jquery.js and backdrop.js, as well as the basePath setting, the
     // first time a JavaScript file is added.
@@ -4271,6 +4234,7 @@ function backdrop_add_js($data = NULL, $options = NULL) {
       // url() generates the prefix using hook_url_outbound_alter(). Instead of
       // running the hook_url_outbound_alter() again here, extract the prefix
       // from url().
+      $prefix = '';
       url('', array('prefix' => &$prefix));
       $javascript = array(
         'settings' => array(
@@ -4296,6 +4260,7 @@ function backdrop_add_js($data = NULL, $options = NULL) {
           'cache' => TRUE,
           'defer' => FALSE,
           'browsers' => array(),
+          'version' => BACKDROP_VERSION,
         ),
       );
       // Backwards-compatibility for JavaScript.
@@ -4409,7 +4374,7 @@ function backdrop_get_js($scope = 'header', $javascript = NULL, $skip_alter = FA
   }
 
   // Sort the JavaScript so that it appears in the correct order.
-  uasort($items, 'backdrop_sort_css_js');
+  backdrop_sort($items, array('group', 'every_page_weight', 'weight'));
 
   // Provide the page with information about the individual JavaScript files
   // used, information not otherwise available when aggregation is enabled.
@@ -4483,10 +4448,6 @@ function backdrop_pre_render_scripts($elements) {
   $embed_prefix = "\n<!--//--><![CDATA[//><!--\n";
   $embed_suffix = "\n//--><!]]>\n";
 
-  // Since JavaScript may look for arguments in the URL and act on them, some
-  // third-party code might require the use of a different query string.
-  $js_version_string = variable_get('js_version_query_string', 'v=');
-
   // Defaults for each SCRIPT element.
   $element_defaults = array(
     '#type' => 'html_tag',
@@ -4523,7 +4484,7 @@ function backdrop_pre_render_scripts($elements) {
         switch ($item['type']) {
           case 'setting':
             $element['#value_prefix'] = $embed_prefix;
-            $element['#value'] = 'jQuery.extend(Backdrop.settings, ' . backdrop_json_encode(backdrop_array_merge_deep_array($item['data'])) . ");";
+            $element['#value'] = 'window.Backdrop = {settings: ' . backdrop_json_encode(backdrop_array_merge_deep_array($item['data'])) . "};";
             $element['#value_suffix'] = $embed_suffix;
             break;
 
@@ -4534,7 +4495,7 @@ function backdrop_pre_render_scripts($elements) {
             break;
 
           case 'file':
-            $query_string = empty($item['version']) ? $default_query_string : $js_version_string . $item['version'];
+            $query_string = empty($item['version']) ? $default_query_string : 'v=' . $item['version'];
             $query_string_separator = (strpos($item['data'], '?') !== FALSE) ? '&' : '?';
             $element['#attributes']['src'] = file_create_url($item['data']) . $query_string_separator . ($item['cache'] ? $query_string : REQUEST_TIME);
             break;
@@ -5219,7 +5180,7 @@ function backdrop_build_js_cache($files) {
     // that rewrite rules are working) and the zlib extension is available then
     // create a gzipped version of this file. This file is served conditionally
     // to browsers that accept gzip using .htaccess rules.
-    if (variable_get('js_gzip_compression', TRUE) && variable_get('clean_url', 0) && extension_loaded('zlib')) {
+    if (settings_get('system.core', 'js_gzip_compression') && config_get('system.core', 'clean_url') && extension_loaded('zlib')) {
       if (!file_exists($uri . '.gz') && !file_unmanaged_save_data(gzencode($contents, 9, FORCE_GZIP), $uri . '.gz', FILE_EXISTS_REPLACE)) {
         return FALSE;
       }
@@ -5234,7 +5195,7 @@ function backdrop_build_js_cache($files) {
  * Deletes old cached JavaScript files and variables.
  */
 function backdrop_clear_js_cache() {
-  variable_del('javascript_parsed');
+  state_del('locale_javascript_parsed');
   state_set('js_cache_files', FALSE);
   file_scan_directory('public://js', '/.*/', array('callback' => 'backdrop_delete_file_if_stale'));
 }
@@ -5403,9 +5364,9 @@ function backdrop_get_hash_salt() {
  *   The private key.
  */
 function backdrop_get_private_key() {
-  if (!($key = variable_get('private_key', 0))) {
+  if (!($key = config_get('system.core', 'private_key'))) {
     $key = backdrop_random_key();
-    variable_set('private_key', $key);
+    config_set('system.core', 'private_key', $key);
   }
   return $key;
 }
@@ -5543,7 +5504,7 @@ function backdrop_page_set_cache() {
         // because by the time it is read, the configuration might change.
         'page_compressed' => $page_compressed,
       ),
-      'expire' => CACHE_TEMPORARY,
+      'expire' => REQUEST_TIME + config_get('system.core', 'page_cache_maximum_age'),
       'created' => REQUEST_TIME,
     );
 
@@ -5552,9 +5513,12 @@ function backdrop_page_set_cache() {
     $header_names = _backdrop_set_preferred_header_name();
     foreach (backdrop_get_http_header() as $name_lower => $value) {
       $cache->data['headers'][$header_names[$name_lower]] = $value;
-      if ($name_lower == 'expires') {
-        // Use the actual timestamp from an Expires header if available.
-        $cache->expire = strtotime($value);
+      if ($name_lower == 'cache-control') {
+        // Set page cache expiration time based on Cache-Control header.
+        $matches = array();
+        if (preg_match('/max-age=(\d+)/', $value, $matches)) {
+          $cache->expire = REQUEST_TIME + $matches[1];
+        }
       }
     }
 
@@ -5608,8 +5572,6 @@ function backdrop_cron_run() {
     foreach ($queues as $queue_name => $info) {
       BackdropQueue::get($queue_name)->createQueue();
     }
-    // Register shutdown callback.
-    backdrop_register_shutdown_function('backdrop_cron_cleanup');
 
     // Iterate through the modules calling their cron handlers (if any):
     foreach (module_implements('cron') as $module) {
@@ -5658,22 +5620,6 @@ function backdrop_cron_run() {
   backdrop_save_session($original_session_saving);
 
   return $return;
-}
-
-/**
- * Shutdown function: Performs cron cleanup.
- *
- * @see backdrop_cron_run()
- * @see backdrop_register_shutdown_function()
- */
-function backdrop_cron_cleanup() {
-  // See if the semaphore is still locked.
-  if (variable_get('cron_semaphore', FALSE)) {
-    watchdog('cron', 'Cron run exceeded the time limit and was aborted.', array(), WATCHDOG_WARNING);
-
-    // Release cron semaphore.
-    variable_del('cron_semaphore');
-  }
 }
 
 /**
@@ -6131,7 +6077,7 @@ function backdrop_render_page($page) {
  *
  * This function is usually called from within another function, like
  * backdrop_get_form() or a theme function. Elements are sorted internally
- * using uasort(). Since this is expensive, when passing already sorted
+ * using backdrop_sort(). Since this is expensive, when passing already sorted
  * elements to backdrop_render(), for example from a database query, set
  * $elements['#sorted'] = TRUE to avoid sorting them a second time.
  *
@@ -6592,45 +6538,6 @@ function backdrop_render_cid_create($elements) {
 }
 
 /**
- * Sorts a structured array by '#weight' property.
- *
- * Callback for uasort() within element_children().
- *
- * @param $a
- *   First item for comparison. The compared items should be associative arrays
- *   that optionally include a '#weight' key.
- * @param $b
- *   Second item for comparison.
- */
-function element_sort($a, $b) {
-  $a_weight = (is_array($a) && isset($a['#weight'])) ? $a['#weight'] : 0;
-  $b_weight = (is_array($b) && isset($b['#weight'])) ? $b['#weight'] : 0;
-  if ($a_weight == $b_weight) {
-    return 0;
-  }
-  return ($a_weight < $b_weight) ? -1 : 1;
-}
-
-/**
- * Sorts a structured array by '#title' property.
- *
- * Callback for uasort() within:
- * - system_modules()
- * - theme_simpletest_test_table()
- *
- * @param $a
- *   First item for comparison. The compared items should be associative arrays
- *   that optionally include a '#title' key.
- * @param $b
- *   Second item for comparison.
- */
-function element_sort_by_title($a, $b) {
-  $a_title = (is_array($a) && isset($a['#title'])) ? $a['#title'] : '';
-  $b_title = (is_array($b) && isset($b['#title'])) ? $b['#title'] : '';
-  return strnatcasecmp($a_title, $b_title);
-}
-
-/**
  * Retrieves the default properties for the defined element type.
  *
  * @param $type
@@ -6672,49 +6579,107 @@ function element_info_property($type, $property_name, $default = NULL) {
 }
 
 /**
- * Sorts a structured array by 'weight' key (no # prefix).
+ * Sort an array based on user-provided keys within that array.
  *
- * Callback for uasort() within:
- * - _field_ui_reduce_order()
- * - update_resolve_dependencies()
- * - archiver_get_info()
- * - backdrop_get_updaters()
- * - backdrop_get_filetransfer_info()
- *
- * @param $a
- *   First item for comparison. The compared items should be associative arrays
- *   that optionally include a 'weight' key.
- * @param $b
- *   Second item for comparison.
+ * @param array $array
+ *   The input array to be sorted.
+ * @param array $keys
+ *   An array of keys on which to be sort. Each key of the $keys array is the
+ *   key by which sorting will be done. Each value of the $keys array must be
+ *   one of the PHP constants sorting, either SORT_NUMERIC or SORT_STRING.
+ *   If an unindexed array is passed in, each value will be assumed to be the
+ *   key by which sorting will be done, and all comparisons will be done as
+ *   though SORT_NUMERIC were passed in for each key.
  */
-function backdrop_sort_weight($a, $b) {
-  $a_weight = (is_array($a) && isset($a['weight'])) ? $a['weight'] : 0;
-  $b_weight = (is_array($b) && isset($b['weight'])) ? $b['weight'] : 0;
-  if ($a_weight == $b_weight) {
-    return 0;
+function backdrop_sort(array &$array, array $keys = array('weight')) {
+  // Ensure all keys have a sort value.
+  $new_keys = array();
+  foreach ($keys as $index => $sort) {
+    if (is_string($sort) && is_int($index)) {
+      $new_keys[$sort] = SORT_NUMERIC;
+    }
+    else {
+      if ($sort === SORT_NUMERIC || $sort === SORT_STRING) {
+        $new_keys[$index] = $sort;
+      }
+      else {
+        // Fallback behavior for unexpected values. Untranslated to allow this
+        // function to be used anywhere within Backdrop.
+        $new_keys[$index] = SORT_NUMERIC;
+        trigger_error('backdrop_sort() expects the second parameter to be an array keyed by strings and each value of the array to be either SORT_NUMERIC or SORT_STRING.', E_USER_WARNING);
+      }
+    }
   }
-  return ($a_weight < $b_weight) ? -1 : 1;
-}
+  $keys = $new_keys;
 
-/**
- * Sorts a structured array by 'title' key (no # prefix).
- *
- * Callback for uasort() within system_admin_index().
- *
- * @param $a
- *   First item for comparison. The compared items should be associative arrays
- *   that optionally include a 'title' key.
- * @param $b
- *   Second item for comparison.
- */
-function backdrop_sort_title($a, $b) {
-  if (!isset($b['title'])) {
-    return -1;
+  // If sorting on a single value, optimize the sorting to sort only on that
+  // specific key without the overhead of recursive handling.
+  if (count($keys) === 1) {
+    $key = key($keys);
+    $key_sort = reset($keys);
+
+    if ($key_sort === SORT_STRING) {
+      uasort($array, function($a, $b) use ($key) {
+        if (!is_array($a) || !is_array($b)) {
+          return 0;
+        }
+        if (!isset($a[$key])) {
+          $a[$key] = '';
+        }
+        if (!isset($b[$key])) {
+          $b[$key] = '';
+        }
+        return strnatcasecmp($a[$key], $b[$key]);
+      });
+    }
+    else {
+      uasort($array, function($a, $b) use ($key) {
+        if (!is_array($a) || !is_array($b)) {
+          return 0;
+        }
+        if (!isset($a[$key])) {
+          $a[$key] = 0;
+        }
+        if (!isset($b[$key])) {
+          $b[$key] = 0;
+        }
+        if ($a[$key] != $b[$key]) {
+          return $a[$key] < $b[$key] ? -1 : 1;
+        }
+      });
+    }
   }
-  if (!isset($a['title'])) {
-    return 1;
+  // If doing a multiple-key comparison, use a recursive callback.
+  else {
+    $keys_map = array_keys($keys);
+    $recursive_callback = function ($a, $b, $key_index = 0) use ($keys, $keys_map, &$recursive_callback) {
+      $key = $keys_map[$key_index];
+      if (!is_array($a) || !is_array($b)) {
+        return 0;
+      }
+      if (!isset($a[$key])) {
+        $a[$key] = 0;
+      }
+      if (!isset($b[$key])) {
+        $b[$key] = 0;
+      }
+      if ($a[$key] == $b[$key]) {
+        // Sort on the next key if one exists.
+        if (isset($keys_map[$key_index + 1])) {
+          return $recursive_callback($a, $b, $key_index + 1);
+        }
+      }
+      else {
+        if ($keys[$key] === SORT_STRING) {
+          return strnatcasecmp($a[$key], $b[$key]);
+        }
+        else {
+          return ($a[$key] < $b[$key]) ? -1 : 1;
+        }
+      }
+    };
+    uasort($array, $recursive_callback);
   }
-  return strcasecmp($a['title'], $b['title']);
 }
 
 /**
@@ -6776,7 +6741,7 @@ function element_children(&$elements, $sort = FALSE) {
   }
   // Sort the children if necessary.
   if ($sort && $sortable) {
-    uasort($children, 'element_sort');
+    backdrop_sort($children, array('#weight'));
     // Put the sorted children back into $elements in the correct order, to
     // preserve sorting if the same element is passed through
     // element_children() twice.
@@ -6866,10 +6831,10 @@ function element_set_attributes(array &$element, array $map) {
  * $value = backdrop_array_get_nested_value($form, $parents);
  * @endcode
  *
- * The return value will be NULL, regardless of whether the actual value is NULL
- * or whether the requested key does not exist. If it is required to know
- * whether the nested array key actually exists, pass a third argument that is
- * altered by reference:
+ * A return value of NULL is ambiguous, and can mean either that the requested
+ * key does not exist, or that the actual value is NULL. If it is required to
+ * know whether the nested array key actually exists, pass a third argument that
+ * is altered by reference:
  * @code
  * $key_exists = NULL;
  * $value = backdrop_array_get_nested_value($form, $parents, $key_exists);
@@ -7143,7 +7108,7 @@ function backdrop_common_theme() {
   return array(
     // From theme.inc.
     'page' => array(
-      'variables' => array('page_top' => '', 'page' => '', 'page_bottom' => ''),
+      'variables' => array('page' => '', 'page_bottom' => ''),
       'template' => 'templates/page',
     ),
     'header' => array(
@@ -7593,8 +7558,8 @@ function backdrop_write_record($table, &$record, $primary_keys = array()) {
     // column allows this.
     //
     // MySQL PDO silently casts e.g. FALSE and '' to 0 when inserting the value
-    // into an integer column, but PostgreSQL PDO does not. Also type cast NULL
-    // when the column does not allow this.
+    // into an integer column. Also type cast NULL when the column does not
+    // allow this.
     if (isset($object->$field) || !empty($info['not null'])) {
       if ($info['type'] == 'int' || $info['type'] == 'serial') {
         $fields[$field] = (int) $fields[$field];
@@ -7687,7 +7652,7 @@ function backdrop_write_record($table, &$record, $primary_keys = array()) {
  * Parses Backdrop module and theme .info files.
  *
  * Info files are NOT for placing arbitrary theme and module-specific settings.
- * Use variable_get() and variable_set() for that.
+ * Use config_get() and config_set() for managing settings.
  *
  * Information stored in a module .info file:
  * - name: The real name of the module for display purposes.
@@ -7811,13 +7776,14 @@ function backdrop_parse_info_format($data, $process_sections = FALSE) {
     foreach ($matches as $match) {
       // Fetch the key and value string.
       $i = 0;
+      $parts = array();
       foreach (array('key', 'value1', 'value2', 'value3') as $var) {
-        $$var = isset($match[++$i]) ? $match[$i] : '';
+        $parts[$var] = isset($match[++$i]) ? $match[$i] : '';
       }
-      $value = stripslashes(substr($value1, 1, -1)) . stripslashes(substr($value2, 1, -1)) . $value3;
+      $value = stripslashes(substr($parts['value1'], 1, -1)) . stripslashes(substr($parts['value2'], 1, -1)) . $parts['value3'];
 
       // Parse array syntax.
-      $keys = preg_split('/\]?\[/', rtrim($key, ']'));
+      $keys = preg_split('/\]?\[/', rtrim($parts['key'], ']'));
       $last = array_pop($keys);
       $parent = &$info;
 
@@ -7936,17 +7902,9 @@ function backdrop_flush_all_caches() {
 
   entity_info_cache_clear();
 
-  // @todo Split cache flushing from rebuilding.
-  // @see http://drupal.org/node/996236
-  if (module_exists('node')) {
-    node_types_rebuild();
-  }
   // node_menu() defines menu items based on node types so it needs to come
   // after node types are rebuilt.
   menu_rebuild();
-
-  // Synchronize to catch any actions that were added or removed.
-  actions_synchronize();
 
   // Ordered so clearing the page cache will always be the last action.
   $core = array('cache', 'path', 'filter', 'bootstrap', 'page');
@@ -8094,7 +8052,7 @@ function archiver_get_info() {
       // Rebuild the cache and save it.
       $archiver_info = module_invoke_all('archiver_info');
       backdrop_alter('archiver_info', $archiver_info);
-      uasort($archiver_info, 'backdrop_sort_weight');
+      backdrop_sort($archiver_info);
       cache()->set('archiver_info', $archiver_info);
     }
     else {
@@ -8133,7 +8091,7 @@ function archiver_get_extensions() {
  *   The full path of the archive file. Note that stream wrapper paths are
  *   supported, but not remote ones.
  *
- * @return
+ * @return ArchiverInterface
  *   A newly created instance of the archiver class appropriate
  *   for the specified file, already bound to that file.
  *   If no appropriate archiver class was found, will return FALSE.
@@ -8178,7 +8136,7 @@ function backdrop_get_updaters() {
   if (!isset($updaters)) {
     $updaters = module_invoke_all('updater_info');
     backdrop_alter('updater_info', $updaters);
-    uasort($updaters, 'backdrop_sort_weight');
+    backdrop_sort($updaters);
   }
   return $updaters;
 }
@@ -8212,7 +8170,7 @@ function backdrop_get_filetransfer_info() {
       }
     }
     backdrop_alter('filetransfer_info', $info);
-    uasort($info, 'backdrop_sort_weight');
+    backdrop_sort($info);
   }
   return $info;
 }

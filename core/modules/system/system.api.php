@@ -267,12 +267,9 @@ function hook_element_info_alter(&$type) {
  * anything because by the time it runs the response is already sent to
  * the browser.
  *
- * Only use this hook if your code must run even for cached page views.
- * If you have code which must run once on all non-cached pages, use
- * hook_init() instead. That is the usual case. If you implement this hook
- * and see an error like 'Call to undefined function', it is likely that
- * you are depending on the presence of a module which has not been loaded yet.
- * It is not loaded because Backdrop is still in bootstrap mode.
+ * This hook by default is not called on pages served by the default page cache,
+ * but can be enabled through the $settings['invoke_page_cache_hooks'] option in
+ * settings.php.
  *
  * @param $destination
  *   If this hook is invoked as part of a backdrop_goto() call, then this argument
@@ -1134,7 +1131,7 @@ function hook_form_alter(&$form, &$form_state, $form_id) {
     $form['workflow']['upload_' . $form['type']['#value']] = array(
       '#type' => 'radios',
       '#title' => t('Attachments'),
-      '#default_value' => variable_get('upload_' . $form['type']['#value'], 1),
+      '#default_value' => config_get('my_module.settings', 'upload_' . $form['type']['#value']),
       '#options' => array(t('Disabled'), t('Enabled')),
     );
   }
@@ -1313,9 +1310,11 @@ function hook_forms($form_id, $args) {
  * This hook is run at the beginning of the page request. It is typically
  * used to set up global parameters that are needed later in the request.
  *
- * Only use this hook if your code must run even for cached page views. This
- * hook is called before the theme, modules, or most include files are loaded
- * into memory. It happens while Backdrop is still in bootstrap mode.
+ * If needing to execute code early in the page request, consider using
+ * hook_init() instead. In hook_boot(), only the most basic APIs are available
+ * and not all modules have been loaded. This hook by default is not called on
+ * pages served by the default page cache, but can be enabled through the
+ * $settings['invoke_page_cache_hooks'] option in settings.php.
  *
  * @see hook_init()
  */
@@ -1800,7 +1799,7 @@ function hook_custom_theme() {
  *     the message is not possible to translate.
  */
 function hook_watchdog(array $log_entry) {
-  global $base_url, $language_interface;
+  global $base_url, $language;
 
   $severity_list = array(
     WATCHDOG_EMERGENCY     => t('Emergency'),
@@ -1846,7 +1845,7 @@ function hook_watchdog(array $log_entry) {
     '@message'       => strip_tags($log_entry['message']),
   ));
 
-  backdrop_mail('emaillog', 'entry', $to, $language_interface, $params);
+  backdrop_mail('emaillog', 'entry', $to, $language, $params);
 }
 
 /**
@@ -1887,14 +1886,14 @@ function hook_mail($key, &$message, $params) {
   );
   if ($context['hook'] == 'taxonomy') {
     $entity = $params['entity'];
-    $vocabulary = taxonomy_vocabulary_load($entity->vid);
+    $vocabulary = taxonomy_vocabulary_load($entity->vocabulary);
     $variables += array(
       '%term_name' => $entity->name,
       '%term_description' => $entity->description,
       '%term_id' => $entity->tid,
       '%vocabulary_name' => $vocabulary->name,
       '%vocabulary_description' => $vocabulary->description,
-      '%vocabulary_id' => $vocabulary->vid,
+      '%vocabulary_machine_name' => $vocabulary->machine_name,
     );
   }
 
@@ -1973,8 +1972,8 @@ function hook_modules_preenable($modules) {
  * @see hook_install()
  */
 function hook_modules_installed($modules) {
-  if (in_array('lousy_module', $modules)) {
-    variable_set('lousy_module_conflicting_variable', FALSE);
+  if (in_array('other_module', $modules)) {
+    backdrop_set_message(t('My module works together with Other Module. See the settings page for new options.'));
   }
 }
 
@@ -2940,7 +2939,7 @@ function hook_update_last_removed() {
  * Remove any information that the module sets.
  *
  * The information that the module should remove includes:
- * - variables that the module has set using variable_set() or system_settings_form()
+ * - settings that the module has set using state_set().
  * - modifications to existing tables
  *
  * The module should not remove its entry from the {system} table. Database
@@ -2965,7 +2964,7 @@ function hook_update_last_removed() {
  * @see hook_modules_uninstalled()
  */
 function hook_uninstall() {
-  variable_del('upload_file_types');
+  state_del('my_module_last_cron');
 }
 
 /**
@@ -3052,10 +3051,10 @@ function hook_class_registry_alter(&$class_registry, $modules) {
  * access to this information.
  *
  * Remember that a user installing Backdrop interactively will be able to reload
- * an installation page multiple times, so you should use variable_set() and
- * variable_get() if you are collecting any data that you need to store and
+ * an installation page multiple times, so you should use state_set() and
+ * state_get() if you are collecting any data that you need to store and
  * inspect later. It is important to remove any temporary variables using
- * variable_del() before your last task has completed and control is handed
+ * state_del() before your last task has completed and control is handed
  * back to the installer.
  * 
  * @param array $install_state
@@ -3115,7 +3114,7 @@ function hook_install_tasks(&$install_state) {
   // Here, we define a variable to allow tasks to indicate that a particular,
   // processor-intensive batch process needs to be triggered later on in the
   // installation.
-  $myprofile_needs_batch_processing = variable_get('myprofile_needs_batch_processing', FALSE);
+  $myprofile_needs_batch_processing = state_get('myprofile_needs_batch_processing', FALSE);
   $tasks = array(
     // This is an example of a task that defines a form which the user who is
     // installing the site will be asked to fill out. To implement this task,
@@ -3123,7 +3122,7 @@ function hook_install_tasks(&$install_state) {
     // as a normal form API callback function, with associated validation and
     // submit handlers. In the submit handler, in addition to saving whatever
     // other data you have collected from the user, you might also call
-    // variable_set('myprofile_needs_batch_processing', TRUE) if the user has
+    // state_set('myprofile_needs_batch_processing', TRUE) if the user has
     // entered data which requires that batch processing will need to occur
     // later on.
     'myprofile_data_import_form' => array(
@@ -3159,7 +3158,7 @@ function hook_install_tasks(&$install_state) {
     // function named myprofile_final_site_setup(), in which additional,
     // automated site setup operations would be performed. Since this is the
     // last task defined by your profile, you should also use this function to
-    // call variable_del('myprofile_needs_batch_processing') and clean up the
+    // call state_del('myprofile_needs_batch_processing') and clean up the
     // variable that was used above. If you want the user to pass to the final
     // Backdrop installation tasks uninterrupted, return no output from this
     // function. Otherwise, return themed output that the user will see (for
@@ -3254,18 +3253,13 @@ function hook_file_mimetype_mapping_alter(&$mapping) {
 /**
  * Declares information about actions.
  *
- * Any module can define actions, and then call actions_do() to make those
+ * Any module can define actions, and then call actions_execute() to make those
  * actions happen in response to events.
  *
- * An action consists of two or three parts:
+ * An action consists of two parts:
  * - an action definition (returned by this hook)
  * - a function which performs the action (which by convention is named
  *   MODULE_description-of-function_action)
- * - an optional form definition function that defines a configuration form
- *   (which has the name of the action function with '_form' appended to it.)
- *
- * The action function takes two to four arguments, which come from the input
- * arguments to actions_do().
  *
  * @return
  *   An associative array of action descriptions. The keys of the array
@@ -3275,19 +3269,12 @@ function hook_file_mimetype_mapping_alter(&$mapping) {
  *     'node', 'user', 'comment', and 'system'.
  *   - 'label': The human-readable name of the action, which should be passed
  *     through the t() function for translation.
- *   - 'configurable': If FALSE, then the action doesn't require any extra
- *     configuration. If TRUE, then your module must define a form function with
- *     the same name as the action function with '_form' appended (e.g., the
- *     form for 'node_assign_owner_action' is 'node_assign_owner_action_form'.)
- *     This function takes $context as its only parameter, and is paired with
- *     the usual _submit function, and possibly a _validate function.
- *   - 'behavior': (optional) A machine-readable array of behaviors of this
- *     action, used to signal additionally required actions that may need to be
- *     triggered. Modules that are processing actions should take special care
- *     for the "presave" hook, in which case a dependent "save" action should
- *     NOT be invoked.
- *   - 'redirect': (optional) A path to which the user will be redirected after
- *     this action has been completed.
+ *   - 'callback': Optional. A function name that will execute the action if the
+ *     name of the action differs from the function name.
+ *   - 'file': Optional. Relative path to a file from the module's directory
+ *     that contains the callback function.
+ *
+ * @see action_get_info()
  *
  * @ingroup actions
  */
@@ -3296,35 +3283,20 @@ function hook_action_info() {
     'comment_unpublish_action' => array(
       'type' => 'comment',
       'label' => t('Unpublish comment'),
-      'configurable' => FALSE,
-      'behavior' => array('changes_property'),
-    ),
-    'comment_unpublish_by_keyword_action' => array(
-      'type' => 'comment',
-      'label' => t('Unpublish comment containing keyword(s)'),
-      'configurable' => TRUE,
-      'behavior' => array('changes_property'),
+      'callback' => 'comment_unpublish_action',
     ),
   );
 }
 
 /**
- * Executes code after an action is deleted.
- *
- * @param $aid
- *   The action ID.
- */
-function hook_actions_delete($aid) {
-  db_delete('actions_assignments')
-    ->condition('aid', $aid)
-    ->execute();
-}
-
-/**
  * Alters the actions declared by another module.
  *
- * Called by actions_list() to allow modules to alter the return values from
+ * Called by action_get_info() to allow modules to alter the return values from
  * implementations of hook_action_info().
+ *
+ * @see action_get_info()
+ *
+ * @ingroup actions
  */
 function hook_action_info_alter(&$actions) {
   $actions['node_unpublish_action']['label'] = t('Unpublish and remove from public view.');
@@ -3921,7 +3893,7 @@ function hook_filetransfer_info() {
  * @see hook_filetransfer_info()
  */
 function hook_filetransfer_info_alter(&$filetransfer_info) {
-  if (variable_get('paranoia', FALSE)) {
+  if (config_get('mymodule.settings', 'paranoia')) {
     // Remove the FTP option entirely.
     unset($filetransfer_info['ftp']);
     // Make sure the SSH option is listed first.

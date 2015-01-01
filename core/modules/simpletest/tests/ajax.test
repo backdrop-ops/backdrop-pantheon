@@ -189,7 +189,7 @@ class AJAXFrameworkTestCase extends AJAXTestCase {
     // The test theme overrides system.css without an implementation,
     // thereby removing it.
     theme_enable(array('test_theme'));
-    variable_set('theme_default', 'test_theme');
+    config_set('system.core', 'theme_default', 'test_theme');
 
     // This gets the form, and emulates an Ajax submission on it, including
     // adding markup to the HEAD and BODY for any lazy loaded JS/CSS files.
@@ -468,7 +468,8 @@ class AJAXFormPageCacheTestCase extends AJAXTestCase {
   public function setUp() {
     parent::setUp();
 
-    config_set('system.core', 'cache', TRUE);
+    config_set('system.core', 'cache', 1);
+    config_set('system.core', 'page_cache_maximum_age', 300);
   }
 
   /**

@@ -33,8 +33,8 @@ const DRUPAL_BOOTSTRAP_SESSION = BACKDROP_BOOTSTRAP_SESSION;
 const DRUPAL_BOOTSTRAP_PAGE_HEADER = BACKDROP_BOOTSTRAP_PAGE_HEADER;
 const DRUPAL_BOOTSTRAP_LANGUAGE = BACKDROP_BOOTSTRAP_LANGUAGE;
 const DRUPAL_BOOTSTRAP_FULL = BACKDROP_BOOTSTRAP_FULL;
-const DRUPAL_ANONYMOUS_RID = BACKDROP_ANONYMOUS_RID;
-const DRUPAL_AUTHENTICATED_RID = BACKDROP_AUTHENTICATED_RID;
+const DRUPAL_ANONYMOUS_RID = BACKDROP_ANONYMOUS_ROLE;
+const DRUPAL_AUTHENTICATED_RID = BACKDROP_AUTHENTICATED_ROLE;
 const DRUPAL_KILOBYTE = BACKDROP_KILOBYTE;
 const DRUPAL_PHP_FUNCTION_PATTERN = BACKDROP_PHP_FUNCTION_PATTERN;
 const DRUPAL_MINIMUM_PHP = BACKDROP_MINIMUM_PHP;
@@ -302,9 +302,6 @@ function drupal_add_css($data = NULL, $options = NULL) {
 function drupal_get_css($css = NULL, $skip_alter = FALSE) {
   return backdrop_get_css($css, $skip_alter);
 }
-function drupal_sort_css_js($a, $b) {
-  return backdrop_sort_css_js($a, $b);
-}
 function drupal_group_css($css) {
   return backdrop_group_css($css);
 }
@@ -409,9 +406,6 @@ function drupal_page_set_cache() {
 function drupal_cron_run() {
   return backdrop_cron_run();
 }
-function drupal_cron_cleanup() {
-  return backdrop_cron_cleanup();
-}
 function drupal_system_listing($mask, $directory, $key = 'name', $min_depth = 1) {
   return backdrop_system_listing($mask, $directory, $key, $min_depth);
 }
@@ -454,12 +448,65 @@ function drupal_render_cid_parts($granularity = NULL) {
 function drupal_render_cid_create($elements) {
   return backdrop_render_cid_create($elements);
 }
+
+/**
+ * Sorts a structured array by '#title' property.
+ *
+ * @deprecated since 1.0
+ * @see backdrop_sort()
+ */
+function element_sort_by_title($a, $b) {
+  $a_title = (is_array($a) && isset($a['#title'])) ? $a['#title'] : '';
+  $b_title = (is_array($b) && isset($b['#title'])) ? $b['#title'] : '';
+  return strnatcasecmp($a_title, $b_title);
+}
+
+/**
+ * Sorts a structured array by '#weight' property.
+ *
+ * @deprecated since 1.0
+ * @see backdrop_sort()
+ */
+function element_sort($a, $b) {
+  $a_weight = (is_array($a) && isset($a['#weight'])) ? $a['#weight'] : 0;
+  $b_weight = (is_array($b) && isset($b['#weight'])) ? $b['#weight'] : 0;
+  if ($a_weight == $b_weight) {
+    return 0;
+  }
+  return ($a_weight < $b_weight) ? -1 : 1;
+}
+
+/**
+ * Sorts a structured array by 'weight' key (no # prefix).
+ *
+ * @deprecated since 1.0
+ * @see backdrop_sort()
+ */
 function drupal_sort_weight($a, $b) {
-  return backdrop_sort_weight($a, $b);
+  $a_weight = (is_array($a) && isset($a['weight'])) ? $a['weight'] : 0;
+  $b_weight = (is_array($b) && isset($b['weight'])) ? $b['weight'] : 0;
+  if ($a_weight == $b_weight) {
+    return 0;
+  }
+  return ($a_weight < $b_weight) ? -1 : 1;
 }
+
+/**
+ * Sorts a structured array by 'title' key (no # prefix).
+ *
+ * @deprecated since 1.0
+ * @see backdrop_sort()
+ */
 function drupal_sort_title($a, $b) {
-  return backdrop_sort_title($a, $b);
+  if (!isset($b['title'])) {
+    return -1;
+  }
+  if (!isset($a['title'])) {
+    return 1;
+  }
+  return strcasecmp($a['title'], $b['title']);
 }
+
 function &drupal_array_get_nested_value(array &$array, array $parents, &$key_exists = NULL) {
   return backdrop_array_get_nested_value($array, $parents, $key_exists);
 }
@@ -765,6 +812,80 @@ function drupal_substr($text, $start, $length = NULL) {
 // Functions from utility.inc.
 function drupal_var_export($var, $prefix = '') {
   return backdrop_var_export($var, $prefix);
+}
+
+/**
+ * Drupal-compatible wrapper for clearing caches.
+ *
+ * Backdrop no longer needs to "rebuild" its node types, which previously
+ * were synced between the code and database in Drupal 7. In Backdrop, all
+ * node types are always stored in config.
+ *
+ * @deprecated since 1.0
+ */
+function node_types_rebuild() {
+  node_type_cache_reset();
+}
+
+/**
+ * Sets up a form to save information automatically.
+ *
+ * This function adds a submit handler and a submit button to a form array. The
+ * submit function saves all the data in the form, using variable_set(), to
+ * variables named the same as the keys in the form array. Note that this means
+ * you should normally prefix your form array keys with your module name, so
+ * that they are unique when passed into variable_set().
+ *
+ * If you need to manipulate the data in a custom manner, you can either put
+ * your own submission handler in the form array before calling this function,
+ * or just use your own submission handler instead of calling this function.
+ *
+ * This function is deprecated in Backdrop because it saves to the old
+ * "variables" table. In Backdrop sites, developers are encouraged to save
+ * configuration using the config system. See config(), config_set(), and
+ * config_get() for information on saving into configuration.
+ *
+ * @deprecated since 1.0
+ */
+function system_settings_form($form) {
+  $form['actions']['#type'] = 'actions';
+  $form['actions']['submit'] = array('#type' => 'submit', '#value' => t('Save configuration'));
+
+  if (!empty($_POST) && form_get_errors()) {
+    backdrop_set_message(t('The settings have not been saved because of the errors.'), 'error');
+  }
+  $form['#submit'][] = 'system_settings_form_submit';
+  if (!isset($form['#theme'])) {
+    $form['#theme'] = 'system_settings_form';
+  }
+  return $form;
+}
+
+/**
+ * Form submission handler for system_settings_form().
+ *
+ * If you want node type configure style handling of your checkboxes,
+ * add an array_filter value to your form.
+ *
+ * Use of this function is discouraged because it is not compatible with the
+ * configuration system. See config(), config_set(), and config_get() for
+ * alternatives. Rather than reusing this submit handler throughout settings
+ * forms, developers should create separate submit handlers for each form
+ * to save the settings into various configuration files as needed.
+ *
+ * @deprecated since 1.0
+ */
+function system_settings_form_submit($form, &$form_state) {
+  form_state_values_clean($form_state);
+
+  foreach ($form_state['values'] as $key => $value) {
+    if (is_array($value) && isset($form_state['values']['array_filter'])) {
+      $value = array_keys(array_filter($value));
+    }
+    variable_set($key, $value);
+  }
+
+  backdrop_set_message(t('The configuration options have been saved.'));
 }
 
 /**

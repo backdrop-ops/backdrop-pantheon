@@ -14,11 +14,11 @@
  *   page.
  */
 function admin_bar_output($complete = FALSE) {
-  global $user, $language_interface;
+  global $user, $language;
   $config = config('admin_bar.settings');
 
   $cache_server_enabled = !$complete;
-  $cid = 'admin_bar:' . $user->uid . ':' . session_id() . ':' . $language_interface->langcode;
+  $cid = 'admin_bar:' . $user->uid . ':' . session_id() . ':' . $language->langcode;
 
   // Try to load and output administration bar from server-side cache. The
   // cache is only valid if a hash key exists, otherwise it needs to be
@@ -641,7 +641,7 @@ function admin_bar_links_search() {
     ),
   );
   $search['search']['search'] = array(
-    '#type' => 'textfield',
+    '#type' => 'search',
     '#title' => t('Admin search'),
     '#title_display' => 'attribute',
     '#attributes' => array(
@@ -677,12 +677,13 @@ function admin_bar_theme_settings() {
     '#title' => t('Enabled components'),
     '#options' => array(
       'admin_bar.icon' => t('Icon menu'),
-      'admin_bar.menu' => t('Administration bar'),
+      'admin_bar.menu' => t('Management menu'),
       'admin_bar.search' => t('Search bar'),
       'admin_bar.users' => t('User counts'),
       'admin_bar.account' => t('Account links'),
     ),
     '#default_value' => $config->get('components'),
+    '#description' => t('These features will be enabled/visible in the administration bar. Untick the boxes to disable/hide them.'),
   );
 
   $process = element_info_property('checkboxes', '#process', array());
@@ -854,16 +855,7 @@ function _admin_bar_flush_cache($name = NULL) {
  * Preprocesses variables for theme_admin_bar_icon().
  */
 function template_preprocess_admin_bar_icon(&$variables) {
-  // Image source might have been passed in as theme variable.
-  $favicon = backdrop_get_favicon();
-  $variables['src'] = $favicon['path'];
-  // Strip the protocol without delimiters for transient HTTP/HTTPS support.
-  // Since the menu is cached on the server-side and client-side, the cached
-  // version might contain a HTTP link, whereas the actual page is on HTTPS.
-  // Relative paths will work fine, but theme_get_setting() returns an
-  // absolute URI.
-  $variables['src'] = preg_replace('@^https?:@', '', $variables['src']);
-  $variables['src'] = check_plain($variables['src']);
+  $variables['src'] = $GLOBALS['base_url'] . '/' . backdrop_get_path('module', 'admin_bar') . '/images/home.png';
   $variables['alt'] = t('Home');
 }
 
@@ -873,7 +865,7 @@ function template_preprocess_admin_bar_icon(&$variables) {
  * @ingroup themeable
  */
 function theme_admin_bar_icon($variables) {
-  return '<img class="admin-bar-icon" src="' . $variables['src'] . '" width="16" height="16" alt="' . $variables['alt'] . '" />';
+  return '<img class="admin-bar-icon" src="' . $variables['src'] . '" width="14" height="12" alt="' . $variables['alt'] . '" />';
 }
 
 
@@ -905,7 +897,7 @@ function theme_admin_bar_links($variables) {
   // everything again. element_sort() is not sufficient here, as it
   // intentionally retains the order of elements having the same #weight,
   // whereas menu links are supposed to be ordered by #weight and #title.
-  uasort($elements, 'admin_bar_element_sort');
+  backdrop_sort($elements, array('#weight' => SORT_NUMERIC, '#title' => SORT_STRING));
   $elements['#sorted'] = TRUE;
 
   $output = '';
@@ -969,20 +961,4 @@ function theme_admin_bar_links($variables) {
     $output = '<ul' . $attributes . '>' . $output . '</ul>';
   }
   return $output;
-}
-
-/**
- * Function used by uasort to sort structured arrays by #weight AND #title.
- */
-function admin_bar_element_sort($a, $b) {
-  // @see element_sort()
-  $a_weight = isset($a['#weight']) ? $a['#weight'] : 0;
-  $b_weight = isset($b['#weight']) ? $b['#weight'] : 0;
-  if ($a_weight == $b_weight) {
-    // @see element_sort_by_title()
-    $a_title = isset($a['#title']) ? $a['#title'] : '';
-    $b_title = isset($b['#title']) ? $b['#title'] : '';
-    return strnatcasecmp($a_title, $b_title);
-  }
-  return ($a_weight < $b_weight) ? -1 : 1;
 }

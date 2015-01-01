@@ -157,14 +157,14 @@ const BACKDROP_BOOTSTRAP_LANGUAGE = 6;
 const BACKDROP_BOOTSTRAP_FULL = 7;
 
 /**
- * Role ID for anonymous users; should match what's in the "role" table.
+ * Role ID for anonymous users.
  */
-const BACKDROP_ANONYMOUS_RID = 1;
+const BACKDROP_ANONYMOUS_ROLE = 'anonymous';
 
 /**
- * Role ID for authenticated users; should match what's in the "role" table.
+ * Role ID for authenticated users.
  */
-const BACKDROP_AUTHENTICATED_RID = 2;
+const BACKDROP_AUTHENTICATED_ROLE = 'authenticated';
 
 /**
  * The number of bytes in a kilobyte.
@@ -195,7 +195,7 @@ const LANGUAGE_TYPE_CONTENT = 'language_content';
 /**
  * The type of language used to select the user interface.
  */
-const LANGUAGE_TYPE_INTERFACE = 'language_interface';
+const LANGUAGE_TYPE_INTERFACE = 'language';
 
 /**
  * The type of language used for URLs.
@@ -771,6 +771,36 @@ function backdrop_settings_initialize() {
   }
 
   $is_https = isset($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) == 'on';
+
+  // Load settings specified by the server, if present
+  if (isset($_SERVER['BACKDROP_SETTINGS'])) {
+    $server_settings = @json_decode($_SERVER['BACKDROP_SETTINGS'], TRUE);
+    if (!is_array($server_settings)) {
+      trigger_error('The values in $_SERVER[BACKDROP_SETTINGS] could not be read. Ensure it is a valid JSON string with no spaces.', E_USER_ERROR);
+    }
+    else {
+      foreach ($server_settings as $key => $value) {
+        // One level of depth should be enough for $settings and $databases.
+        if ($key == 'settings') {
+          foreach($value as $settings_key => $settings_value) {
+            $settings[$settings_key] = $settings_value;
+          }
+        }
+        elseif ($key == 'databases') {
+          // Protect default configuration but allow the specification of
+          // additional databases.
+          if (!isset($databases) || !is_array($databases)) {
+            $databases = array();
+          }
+          $databases = array_replace_recursive($databases, $value);
+        }
+        else {
+          $$key = $value;
+        }
+      }
+    }
+  }
+
   if (isset($base_url)) {
     // Parse fixed base URL from settings.php.
     $parts = parse_url($base_url);
@@ -960,6 +990,8 @@ function backdrop_get_filename($type, $name, $filename = NULL) {
  * The variable table is composed of values that have been saved in the table
  * with variable_set() as well as those explicitly specified in the
  * configuration file.
+ *
+ * @deprecated since 1.0
  */
 function variable_initialize($conf = array()) {
   // NOTE: caching the variables improves performance by 20% when serving
@@ -1021,6 +1053,13 @@ function settings_get($name, $default = NULL) {
  * collation used. To avoid problems, always use lower case for persistent
  * variable names.
  *
+ * This function is deprecated in Backdrop and will be removed in a future
+ * release. Variables are not managed through the configuration system, so they
+ * cannot be moved between environments safely. If your module needs to save
+ * configuration settings, use config_get() instead. If you need to save an
+ * environment-specific setting (such as the last time cron ran), use
+ * state_get() instead.
+ *
  * @param $name
  *   The name of the variable to return.
  * @param $default
@@ -1031,6 +1070,10 @@ function settings_get($name, $default = NULL) {
  *
  * @see variable_del()
  * @see variable_set()
+ * @see config_get()
+ * @see state_get()
+ *
+ * @deprecated since 1.0
  */
 function variable_get($name, $default = NULL) {
   global $conf;
@@ -1045,6 +1088,13 @@ function variable_get($name, $default = NULL) {
  * collation used. To avoid problems, always use lower case for persistent
  * variable names.
  *
+ * This function is deprecated in Backdrop and will be removed in a future
+ * release. Variables are not managed through the configuration system, so they
+ * cannot be moved between environments safely. If your module needs to save
+ * configuration settings, use config_set() instead. If you need to save an
+ * environment-specific setting (such as the last time cron ran), use
+ * state_set() instead.
+ *
  * @param $name
  *   The name of the variable to set.
  * @param $value
@@ -1053,6 +1103,10 @@ function variable_get($name, $default = NULL) {
  *
  * @see variable_del()
  * @see variable_get()
+ * @see config_set()
+ * @see state_set()
+ *
+ * @deprecated since 1.0
  */
 function variable_set($name, $value) {
   global $conf;
@@ -1076,6 +1130,8 @@ function variable_set($name, $value) {
  *
  * @see variable_get()
  * @see variable_set()
+ *
+ * @deprecated since 1.0
  */
 function variable_del($name) {
   global $conf;
@@ -1190,7 +1246,7 @@ function state_del($name) {
     ->condition('name', $name)
     ->execute();
   cache('cache')->delete('states');
-  if (array_key_exists($name, $states)) {
+  if ($states && array_key_exists($name, $states)) {
     unset($states[$name]);
   }
 }
@@ -1220,10 +1276,10 @@ function backdrop_page_get_cache($check_only = FALSE) {
 
   if (backdrop_page_is_cacheable()) {
     $cache = cache('page')->get($base_root . request_uri());
-    if ($cache !== FALSE) {
+    if ($cache !== FALSE && $cache->expire >= REQUEST_TIME) {
       $cache_hit = TRUE;
+      return $cache;
     }
-    return $cache;
   }
 }
 
@@ -1564,7 +1620,7 @@ function backdrop_serve_page_from_cache(stdClass $cache) {
  * Defines the critical hooks that force modules to always be loaded.
  */
 function bootstrap_hooks() {
-  return array('boot', 'exit', 'watchdog', 'language_init');
+  return array('boot', 'exit', 'watchdog', 'language_init', 'language_negotiation_info', 'language_negotiation_info_alter', 'language_types_info', 'language_types_info_alter');
 }
 
 /**
@@ -1648,15 +1704,28 @@ function backdrop_unpack($obj, $field = 'data') {
  * @ingroup sanitization
  */
 function t($string, array $args = array(), array $options = array()) {
-  global $language_interface;
-  //static $custom_strings;
+  global $language;
+
+  // Use the advanced backdrop_static() pattern, since this is called very often.
+  static $backdrop_static_fast;
+  if (!isset($backdrop_static_fast)) {
+    $backdrop_static_fast['t'] = &backdrop_static(__FUNCTION__, array());
+  }
+  $custom_strings = &$backdrop_static_fast['t']['custom_strings'];
+  $translate_english = &$backdrop_static_fast['t']['translate_english'];
 
   // Merge in default.
   if (empty($options['langcode'])) {
-    $options['langcode'] = isset($language_interface->langcode) ? $language_interface->langcode : LANGUAGE_SYSTEM;
+    $options['langcode'] = isset($language->langcode) ? $language->langcode : LANGUAGE_SYSTEM;
   }
   if (empty($options['context'])) {
     $options['context'] = '';
+  }
+
+  // Locale module may not have been enabled, so we check for NULL value here
+  // and statically cache the result for performance.
+  if (!isset($translate_english)) {
+    $translate_english = config_get('locale.settings', 'translate_english') ? TRUE : FALSE;
   }
 
   // First, check for an array of customized strings. If present, use the array
@@ -1671,7 +1740,7 @@ function t($string, array $args = array(), array $options = array()) {
     $string = $custom_strings[$options['langcode']][$options['context']][$string];
   }
   // Translate with locale module if enabled.
-  elseif ($options['langcode'] != LANGUAGE_SYSTEM && ($options['langcode'] != 'en' || variable_get('locale_translate_english', FALSE)) && function_exists('locale')) {
+  elseif ($options['langcode'] != LANGUAGE_SYSTEM && ($options['langcode'] != 'en' || $translate_english) && function_exists('locale')) {
     $string = locale($string, $options['context'], $options['langcode']);
   }
   if (empty($args)) {
@@ -2402,7 +2471,7 @@ function backdrop_bootstrap($phase = NULL, $new_phase = TRUE) {
           break;
 
         case BACKDROP_BOOTSTRAP_SESSION:
-          require_once BACKDROP_ROOT . '/' . variable_get('session_inc', 'core/includes/session.inc');
+          require_once BACKDROP_ROOT . '/' . settings_get('session_inc', 'core/includes/session.inc');
           backdrop_session_initialize();
           break;
 
@@ -2537,11 +2606,11 @@ function _backdrop_bootstrap_page_cache() {
   // Allow specifying special cache handlers in settings.php, like
   // using memcached or files for storing cache information.
   require_once BACKDROP_ROOT . '/core/includes/cache.inc';
-  foreach (variable_get('cache_backends', array()) as $include) {
+  foreach (settings_get('cache_backends', array()) as $include) {
     require_once BACKDROP_ROOT . '/' . $include;
   }
   // Check for a cache mode force from settings.php.
-  if (variable_get('page_cache_without_database')) {
+  if (settings_get('page_cache_without_database')) {
     $cache_enabled = TRUE;
   }
   else {
@@ -2563,15 +2632,15 @@ function _backdrop_bootstrap_page_cache() {
       $_GET['q'] = $cache->data['path'];
       backdrop_set_title($cache->data['title'], PASS_THROUGH);
       date_default_timezone_set(backdrop_get_user_timezone());
-      // If the skipping of the bootstrap hooks is not enforced, call
-      // hook_boot.
-      if (variable_get('page_cache_invoke_hooks', TRUE)) {
+      // Calls to hook_boot() on page cache requests is deprecated, though they
+      // can still be enabled via settings.php
+      if (settings_get('page_cache_invoke_hooks', FALSE)) {
         bootstrap_invoke_all('boot');
       }
       backdrop_serve_page_from_cache($cache);
-      // If the skipping of the bootstrap hooks is not enforced, call
-      // hook_exit.
-      if (variable_get('page_cache_invoke_hooks', TRUE)) {
+      // Like hook_boot(), hook_exit() is no longer called on page cache
+      // requests unless enabled via settings.php.
+      if (settings_get('page_cache_invoke_hooks', FALSE)) {
         bootstrap_invoke_all('exit');
       }
       // We are done.
@@ -2632,8 +2701,18 @@ function _backdrop_bootstrap_database() {
 function _backdrop_bootstrap_variables() {
   global $conf;
 
+  // Populate global settings for this test if set. Because state_get() has
+  // overhead of locking/unlocking, we use the simpler tempstore_get() function
+  // when needing to populate settings in tests.
+  if ($test_prefix = backdrop_valid_test_ua() && db_table_exists('tempstore')) {
+    include_once BACKDROP_ROOT . '/core/includes/common.inc';
+    if ($settings = tempstore_get('simpletest', 'settings')) {
+      $GLOBALS['settings'] = array_merge($GLOBALS['settings'], $settings);
+    }
+  }
+
   // Initialize the lock system.
-  require_once BACKDROP_ROOT . '/' . variable_get('lock_inc', 'core/includes/lock.inc');
+  require_once BACKDROP_ROOT . '/' . settings_get('lock_inc', 'core/includes/lock.inc');
   lock_initialize();
 
   // Load variables from the database, but do not overwrite variables set in settings.php.
@@ -2748,12 +2827,12 @@ function backdrop_maintenance_theme() {
  * accounted for in this function.
  */
 function fast_404() {
-  $exclude_paths = variable_get('404_fast_paths_exclude', FALSE);
+  $exclude_paths = settings_get('404_fast_paths_exclude', FALSE);
   if ($exclude_paths && !preg_match($exclude_paths, $_GET['q'])) {
-    $fast_paths = variable_get('404_fast_paths', FALSE);
+    $fast_paths = settings_get('404_fast_paths', FALSE);
     if ($fast_paths && preg_match($fast_paths, $_GET['q'])) {
       backdrop_add_http_header('Status', '404 Not Found');
-      $fast_404_html = variable_get('404_fast_html', '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested URL "@path" was not found on this server.</p></body></html>');
+      $fast_404_html = settings_get('404_fast_html', '<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested URL "@path" was not found on this server.</p></body></html>');
       // Replace @path in the variable with the page path.
       print strtr($fast_404_html, array('@path' => check_plain(request_uri())));
       exit;
@@ -2808,20 +2887,21 @@ function get_t() {
  * Initializes all the defined language types.
  */
 function backdrop_language_initialize() {
-  $types = language_types_get_all();
 
   // Ensure the language is correctly returned, even without multilanguage
   // support. Also make sure we have a $language fallback, in case a language
   // negotiation callback needs to do a full bootstrap.
   // Useful for eg. XML/HTML 'lang' attributes.
   $default = language_default();
-  foreach ($types as $type) {
-    $GLOBALS[$type] = $default;
+  $default_types = language_types_get_default();
+  foreach ($default_types as $type_name => $configurable) {
+    $GLOBALS[$type_name] = $default;
   }
   if (language_multilingual()) {
     include_once BACKDROP_ROOT . '/core/includes/language.inc';
-    foreach ($types as $type) {
-      $GLOBALS[$type] = language_types_initialize($type);
+    $types = language_types_info();
+    foreach ($types as $type_name => $type_info) {
+      $GLOBALS[$type_name] = language_types_initialize($type_name);
     }
     // Allow modules to react on language system initialization in multilingual
     // environments.
@@ -2829,16 +2909,6 @@ function backdrop_language_initialize() {
   }
 }
 
-/**
- * Returns an array of the available language types.
- *
- * @return
- *   An array of all language types where the keys of each are the language
- *   type name and its value is its configurability (TRUE/FALSE).
- */
-function language_types_get_all() {
-  return array_keys(variable_get('language_types', language_types_get_default()));
-}
 /**
  * Returns a list of the built-in language types.
  *
@@ -2864,7 +2934,7 @@ function language_multilingual() {
   // The "language_count" variable stores the number of enabled languages to
   // avoid unnecessarily querying the database when building the list of
   // enabled languages on monolingual sites.
-  return variable_get('language_count', 1) > 1;
+  return config_get('system.core', 'language_count') > 1;
 }
 
 /**
@@ -2885,21 +2955,37 @@ function language_list($only_enabled = FALSE) {
     $languages = array('all' => array(), 'enabled' => array());
 
     // Fill in master language list based on current configuration.
-    $default = language_default();
-    if (language_multilingual() || module_exists('language')) {
+    $default_langcode = config_get('system.core', 'language_default');
+    $config_languages = config_get('language.settings', 'languages');
+    if ($config_languages) {
       // Use language module configuration if available.
-      $languages['all'] = db_query('SELECT * FROM {language} ORDER BY weight ASC, name ASC')->fetchAllAssoc('langcode');
+      include_once BACKDROP_ROOT . '/core/includes/common.inc';
+      foreach ($config_languages as $langcode => $language) {
+        $language += array(
+          'enabled' => TRUE,
+          'weight' => 0,
+        );
+        $languages['all'][$langcode] = (object) $language;
+      }
     }
-    else {
-      // No language module, so use the default language only.
-      $languages['all'][$default->langcode] = $default;
+
+    if (empty($languages['all'])) {
+      // No language module, so only English is supported.
+      $languages['all']['en'] = (object) array(
+        'langcode' => 'en',
+        'name' => 'English',
+        'direction' => 0,
+        'enabled' => TRUE,
+        'weight' => 0,
+        'default' => TRUE,
+      );
     }
 
     // Initialize default property so callers have an easy reference and can
     // save the same object without data loss. Also fill in the filtered list
     // of enabled languages only.
     foreach ($languages['all'] as $langcode => $language) {
-      $languages['all'][$langcode]->default = ($langcode == $default->langcode);
+      $languages['all'][$langcode]->default = ($langcode == $default_langcode);
       if ($language->enabled) {
         $languages['enabled'][$langcode] = $languages['all'][$langcode];
       }
@@ -2951,14 +3037,37 @@ function language_name($langcode) {
  *   A language object.
  */
 function language_default() {
-  $default = variable_get('language_default', (object) array(
-    'langcode' => 'en',
-    'name' => 'English',
-    'direction' => 0,
-    'enabled' => 1,
-    'weight' => 0,
-  ));
-  $default->default = TRUE;
+  $default = &backdrop_static(__FUNCTION__);
+
+  if (!isset($default)) {
+    $default_langcode = config_get('system.core', 'language_default');
+    if ($default_langcode !== 'en') {
+      $languages = language_list();
+      if (isset($languages[$default_langcode])) {
+        $default = $languages[$default_langcode];
+      }
+      else {
+        $default = (object) array(
+          'langcode' => $default_langcode,
+          'name' => 'Default',
+          'direction' => 0,
+          'enabled' => TRUE,
+          'weight' => 0,
+        );
+      }
+    }
+    else {
+      $default = (object) array(
+        'langcode' => 'en',
+        'name' => 'English',
+        'direction' => 0,
+        'enabled' => TRUE,
+        'weight' => 0,
+      );
+    }
+    $default->default = TRUE;
+  }
+
   return $default;
 }
 
@@ -3332,11 +3441,11 @@ function backdrop_autoload($class) {
  *
  * Example:
  * @code
- * function actions_do(...) {
+ * function actions_execute(...) {
  *   // $stack tracks the number of recursive calls.
  *   static $stack;
  *   $stack++;
- *   if ($stack > variable_get('actions_max_stack', 35)) {
+ *   if ($stack > config_get('system.core', 'action_recursion_limit', 35)) {
  *     ...
  *     return;
  *   }
@@ -3455,21 +3564,21 @@ function backdrop_is_cli() {
  * Detects if this is an HTML HTTP request.
  */
 function backdrop_is_html() {
-  return strpos($_SERVER['HTTP_ACCEPT'], 'text/html') === 0 || ((empty($_SERVER['HTTP_ACCEPT']) || $_SERVER['HTTP_ACCEPT'] === '*/*') && empty($_SERVER['X_REQUESTED_WITH']));
+  return ((empty($_SERVER['HTTP_ACCEPT']) || $_SERVER['HTTP_ACCEPT'] === '*/*') && empty($_SERVER['X_REQUESTED_WITH'])) || strpos($_SERVER['HTTP_ACCEPT'], 'text/html') === 0;
 }
 
 /**
  * Detects if this is an AJAX HTTP request.
  */
 function backdrop_is_ajax() {
-  return strpos($_SERVER['HTTP_ACCEPT'], 'application/vnd.backdrop-ajax') === 0;
+  return !empty($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/vnd.backdrop-ajax') === 0;
 }
 
 /**
  * Detects if this is a dialog HTTP request.
  */
 function backdrop_is_dialog() {
-  return strpos($_SERVER['HTTP_ACCEPT'], 'application/vnd.backdrop-dialog') === 0;
+  return !empty($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/vnd.backdrop-dialog') === 0;
 }
 
 /**

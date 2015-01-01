@@ -254,7 +254,7 @@ function file_uri_target($uri) {
  *   'public', 'private' or any other file scheme defined as the default.
  */
 function file_default_scheme() {
-  return variable_get('file_default_scheme', 'public');
+  return config_get('system.core', 'file_default_scheme');
 }
 
 /**
@@ -462,7 +462,7 @@ function file_prepare_directory(&$directory, $options = FILE_MODIFY_PERMISSIONS)
  */
 function file_ensure_htaccess() {
   file_save_htaccess('public://', FALSE);
-  if (variable_get('file_private_path', FALSE)) {
+  if (config_get('system.core', 'file_private_path')) {
     file_save_htaccess('private://', TRUE);
   }
   file_save_htaccess('temporary://', TRUE);
@@ -1132,7 +1132,7 @@ function file_munge_filename($filename, $extensions, $alerts = TRUE) {
   $original = $filename;
 
   // Allow potentially insecure uploads for very savvy users and admin
-  if (!variable_get('allow_insecure_uploads', 0)) {
+  if (!settings_get('allow_insecure_uploads', 0)) {
     // Remove any null bytes. See http://php.net/manual/security.filesystem.nullbytes.php
     $filename = str_replace(chr(0), '', $filename);
 
@@ -1485,7 +1485,7 @@ function file_save_upload($form_field_name, $validators = array(), $destination 
   // rename filename.php.foo and filename.php to filename.php.foo.txt and
   // filename.php.txt, respectively). Don't rename if 'allow_insecure_uploads'
   // evaluates to TRUE.
-  if (!variable_get('allow_insecure_uploads', 0) && preg_match('/\.(php|pl|py|cgi|asp|js)(\.|$)/i', $file->filename) && (substr($file->filename, -4) != '.txt')) {
+  if (!settings_get('allow_insecure_uploads', 0) && preg_match('/\.(php|pl|py|cgi|asp|js)(\.|$)/i', $file->filename) && (substr($file->filename, -4) != '.txt')) {
     $file->filemime = 'text/plain';
     $file->uri .= '.txt';
     $file->filename .= '.txt';
@@ -1690,8 +1690,6 @@ function file_validate_extensions(File $file, $extensions) {
 /**
  * Checks that the file's size is below certain limits.
  *
- * This check is not enforced for the user #1.
- *
  * @param File $file
  *   A file entity.
  * @param $file_limit
@@ -1712,17 +1710,15 @@ function file_validate_size(File $file, $file_limit = 0, $user_limit = 0) {
 
   $errors = array();
 
-  // Bypass validation for uid  = 1.
-  if ($user->uid != 1) {
-    if ($file_limit && $file->filesize > $file_limit) {
-      $errors[] = t('The file is %filesize exceeding the maximum file size of %maxsize.', array('%filesize' => format_size($file->filesize), '%maxsize' => format_size($file_limit)));
-    }
-
-    // Save a query by only calling file_space_used() when a limit is provided.
-    if ($user_limit && (file_space_used($user->uid) + $file->filesize) > $user_limit) {
-      $errors[] = t('The file is %filesize which would exceed your disk quota of %quota.', array('%filesize' => format_size($file->filesize), '%quota' => format_size($user_limit)));
-    }
+  if ($file_limit && $file->filesize > $file_limit) {
+    $errors[] = t('The file is %filesize exceeding the maximum file size of %maxsize.', array('%filesize' => format_size($file->filesize), '%maxsize' => format_size($file_limit)));
   }
+
+  // Save a query by only calling file_space_used() when a limit is provided.
+  if ($user_limit && (file_space_used($user->uid) + $file->filesize) > $user_limit) {
+      $errors[] = t('The file is %filesize which would exceed your disk quota of %quota.', array('%filesize' => format_size($file->filesize), '%quota' => format_size($user_limit)));
+  }
+
   return $errors;
 }
 
@@ -1967,7 +1963,7 @@ function file_download() {
   }
   else {
     backdrop_not_found();
-  }  
+  }
   backdrop_exit();
 }
 
@@ -2193,10 +2189,10 @@ function file_get_mimetype($uri, $mapping = NULL) {
 function backdrop_chmod($uri, $mode = NULL) {
   if (!isset($mode)) {
     if (is_dir($uri)) {
-      $mode = variable_get('file_chmod_directory', 0775);
+      $mode = settings_get('file_chmod_directory', 0775);
     }
     else {
-      $mode = variable_get('file_chmod_file', 0664);
+      $mode = settings_get('file_chmod_file', 0664);
     }
   }
 
@@ -2365,7 +2361,7 @@ function backdrop_basename($uri, $suffix = NULL) {
  */
 function backdrop_mkdir($uri, $mode = NULL, $recursive = FALSE, $context = NULL) {
   if (!isset($mode)) {
-    $mode = variable_get('file_chmod_directory', 0775);
+    $mode = settings_get('file_chmod_directory', 0775);
   }
 
   if (!isset($context)) {
@@ -2451,7 +2447,7 @@ function backdrop_tempnam($directory, $prefix) {
  * Gets the path of system-appropriate temporary directory.
  */
 function file_directory_temp() {
-  $temporary_directory = variable_get('file_temporary_path', NULL);
+  $temporary_directory = config_get('system.core', 'file_temporary_path');
 
   if (empty($temporary_directory)) {
     $directories = array();
@@ -2481,7 +2477,7 @@ function file_directory_temp() {
 
     if (empty($temporary_directory)) {
       // If no directory has been found default to 'files/tmp'.
-      $temporary_directory = variable_get('file_public_path', 'files') . '/tmp';
+      $temporary_directory = config_get('system.core', 'file_public_path') . '/tmp';
 
       // Windows accepts paths with either slash (/) or backslash (\), but will
       // not accept a path which contains both a slash and a backslash. Since
@@ -2490,7 +2486,7 @@ function file_directory_temp() {
       $temporary_directory = str_replace('\\', '/', $temporary_directory);
     }
     // Save the path of the discovered directory.
-    variable_set('file_temporary_path', $temporary_directory);
+    config_set('system.core', 'file_temporary_path', $temporary_directory);
   }
 
   return $temporary_directory;

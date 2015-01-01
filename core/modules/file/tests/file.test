@@ -61,13 +61,17 @@ class FileFieldTestCase extends BackdropWebTestCase {
    *   A list of widget settings that will be added to the widget defaults.
    */
   function createFileField($name, $type_name, $field_settings = array(), $instance_settings = array(), $widget_settings = array()) {
+    $cardinality = 1;
+    if (isset($field_settings['cardinality'])) {
+      $cardinality = $field_settings['cardinality'];
+      unset($field_settings['cardinality']);
+    }
     $field = array(
       'field_name' => $name,
       'type' => 'file',
-      'settings' => array(),
-      'cardinality' => !empty($field_settings['cardinality']) ? $field_settings['cardinality'] : 1,
+      'cardinality' => $cardinality,
+      'settings' => $field_settings,
     );
-    $field['settings'] = array_merge($field['settings'], $field_settings);
     field_create_field($field);
 
     $this->attachFileField($name, 'node', $type_name, $instance_settings, $widget_settings);
@@ -376,8 +380,8 @@ class FileFieldWidgetTestCase extends FileFieldTestCase {
     // own default file or image field, this test can be made more robust by
     // using a custom node type.
     $type_name = 'page';
-    $field_name = strtolower($this->randomName());
-    $field_name2 = strtolower($this->randomName());
+    $field_name = 'file1';
+    $field_name2 = 'file2';
     $this->createFileField($field_name, $type_name, array('cardinality' => 3));
     $this->createFileField($field_name2, $type_name, array('cardinality' => 3));
 
@@ -533,9 +537,9 @@ class FileFieldWidgetTestCase extends FileFieldTestCase {
   function testPrivateFileComment() {
     $user = $this->backdropCreateUser(array('access comments'));
 
-    // Remove access comments permission from anon user.
+    // Remove access comments permission from anonymous user.
     $edit = array(
-      '1[access comments]' => FALSE,
+      'anonymous[access comments]' => FALSE,
     );
     $this->backdropPost('admin/config/people/permissions', $edit, t('Save permissions'));
 
@@ -822,6 +826,7 @@ class FileFieldValidateTestCase extends FileFieldTestCase {
 
     // Try again with a multiple value field.
     field_delete_field($field_name);
+    field_purge_batch(10);
     $this->createFileField($field_name, $type_name, array('cardinality' => FIELD_CARDINALITY_UNLIMITED), array('required' => '1'));
 
     // Try to post a new node without uploading a file in the multivalue field.
@@ -1018,10 +1023,10 @@ class FileTokenReplaceTestCase extends FileFieldTestCase {
    * Creates a file, then tests the tokens generated from it.
    */
   function testFileTokenReplacement() {
-    global $language_interface;
+    global $language;
     $url_options = array(
       'absolute' => TRUE,
-      'language' => $language_interface,
+      'language' => $language,
     );
 
     // Create file field.
@@ -1051,8 +1056,8 @@ class FileTokenReplaceTestCase extends FileFieldTestCase {
     $tests['[file:mime]'] = check_plain($file->filemime);
     $tests['[file:size]'] = format_size($file->filesize);
     $tests['[file:url]'] = check_plain(file_create_url($file->uri));
-    $tests['[file:timestamp]'] = format_date($file->timestamp, 'medium', '', NULL, $language_interface->langcode);
-    $tests['[file:timestamp:short]'] = format_date($file->timestamp, 'short', '', NULL, $language_interface->langcode);
+    $tests['[file:timestamp]'] = format_date($file->timestamp, 'medium', '', NULL, $language->langcode);
+    $tests['[file:timestamp:short]'] = format_date($file->timestamp, 'short', '', NULL, $language->langcode);
     $tests['[file:owner]'] = check_plain(user_format_name($this->admin_user));
     $tests['[file:owner:uid]'] = $file->uid;
 
@@ -1060,7 +1065,7 @@ class FileTokenReplaceTestCase extends FileFieldTestCase {
     $this->assertFalse(in_array(0, array_map('strlen', $tests)), 'No empty tokens generated.');
 
     foreach ($tests as $input => $expected) {
-      $output = token_replace($input, array('file' => $file), array('language' => $language_interface));
+      $output = token_replace($input, array('file' => $file), array('language' => $language));
       $this->assertEqual($output, $expected, format_string('Sanitized file token %token replaced.', array('%token' => $input)));
     }
 
@@ -1071,7 +1076,7 @@ class FileTokenReplaceTestCase extends FileFieldTestCase {
     $tests['[file:size]'] = format_size($file->filesize);
 
     foreach ($tests as $input => $expected) {
-      $output = token_replace($input, array('file' => $file), array('language' => $language_interface, 'sanitize' => FALSE));
+      $output = token_replace($input, array('file' => $file), array('language' => $language, 'sanitize' => FALSE));
       $this->assertEqual($output, $expected, format_string('Unsanitized file token %token replaced.', array('%token' => $input)));
     }
   }
