@@ -533,21 +533,3 @@ $settings['backdrop_drupal_compatibility'] = TRUE;
 if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
   $_SERVER['BACKDROP_SETTINGS'] = $_SERVER['PRESSFLOW_SETTINGS'];
 }
-
-/**
- * Pantheon specific compatibility.
- *
- * Override the public file path to use the Pantheon specified path.
- */
-if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
-  $conf['file_public_path'] = 'sites/default/files';
-}
-
-/**
- * Pantheon specific compatibility.
- *
- * Handle Hash Salt Value for Backdrop.
- */
-if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
-  $settings['hash_salt'] = $drupal_hash_salt; // Apologies for the $drupal variable
-}
