@@ -16,7 +16,7 @@
  * check the Drupal 7 version once the update process has begun, so instead
  * we check the schema version of system.module in the system table.
  */
-const REQUIRED_D7_SCHEMA_VERSION = '7069';
+define('REQUIRED_D7_SCHEMA_VERSION', '7069');
 
 /**
  * Disable any items in the {system} table that are not core compatible.
@@ -321,6 +321,10 @@ function update_fix_requirements() {
       }
       update_module_enable(array('views'));
     }
+
+    // Empty a few basic caches.
+    db_query('TRUNCATE {cache}');
+    db_query('TRUNCATE {cache_bootstrap}');
 
     state_set('update_backdrop_requirements', TRUE);
   }

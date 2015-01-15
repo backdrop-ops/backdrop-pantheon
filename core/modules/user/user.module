@@ -8,23 +8,23 @@
 /**
  * Maximum length of username text field.
  */
-const USERNAME_MAX_LENGTH = 60;
+define('USERNAME_MAX_LENGTH', 60);
 
 /**
  * Only administrators can create user accounts.
  */
-const USER_REGISTER_ADMINISTRATORS_ONLY = 'admin_only';
+define('USER_REGISTER_ADMINISTRATORS_ONLY', 'admin_only');
 
 /**
  * Visitors can create their own accounts.
  */
-const USER_REGISTER_VISITORS = 'visitors';
+define('USER_REGISTER_VISITORS', 'visitors');
 
 /**
  * Visitors can create accounts, but they don't become active without
  * administrative approval.
  */
-const USER_REGISTER_VISITORS_ADMINISTRATIVE_APPROVAL = 'visitors_admin_approval';
+define('USER_REGISTER_VISITORS_ADMINISTRATIVE_APPROVAL', 'visitors_admin_approval');
 
 /**
  * Invokes a user hook in every module.
@@ -938,64 +938,14 @@ function user_login_block($form) {
  * Implements hook_block_info().
  */
 function user_block_info() {
-  global $user;
+  $blocks = array();
 
   $blocks['login'] = array(
     'info' => t('User login'),
     'description' => t('The user login form if logged out.'),
   );
-  $blocks['new'] = array(
-    'info' => t('Who\'s new'),
-    'description' => t('A listing of newly registered users.'),
-    'cache' => BACKDROP_CACHE_PER_ROLE,
-  );
-  $blocks['online'] = array(
-    'info' => t('Who\'s online'),
-    'description' => t('A listing of currently online users.'),
-  );
 
   return $blocks;
-}
-
-/**
- * Implements hook_block_configure().
- */
-function user_block_configure($delta = '', $settings = array()) {
-  switch ($delta) {
-    case 'new':
-      $settings += array(
-        'new_count' => 5,
-      );
-      $form['new_count'] = array(
-        '#type' => 'select',
-        '#title' => t('Number of users to display'),
-        '#default_value' => $settings['new_count'],
-        '#options' => range(1, 10),
-      );
-      return $form;
-
-    case 'online':
-      $settings += array(
-        'seconds_online' => 900,
-        'list_count' => 10,
-      );
-      $period = backdrop_map_assoc(array(30, 60, 120, 180, 300, 600, 900, 1800, 2700, 3600, 5400, 7200, 10800, 21600, 43200, 86400), 'format_interval');
-      $form['seconds_online'] = array(
-        '#type' => 'select',
-        '#title' => t('User activity'),
-        '#default_value' => $settings['seconds_online'],
-        '#options' => $period,
-        '#description' => t('A user is considered online for this long after they have last viewed a page.'),
-      );
-      $form['list_count'] = array(
-        '#type' => 'select',
-        '#title' => t('User list length'),
-        '#default_value' => $settings['list_count'],
-        '#options' => backdrop_map_assoc(array(0, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100)),
-        '#description' => t('Maximum number of currently online users to display.'),
-      );
-      return $form;
-  }
 }
 
 /**
@@ -1003,7 +953,6 @@ function user_block_configure($delta = '', $settings = array()) {
  */
 function user_block_view($delta = '', $settings = array()) {
   global $user;
-
   $block = array();
 
   switch ($delta) {
@@ -1013,42 +962,6 @@ function user_block_view($delta = '', $settings = array()) {
 
         $block['subject'] = t('User login');
         $block['content'] = backdrop_get_form('user_login_block');
-      }
-      return $block;
-
-    case 'new':
-      if (user_access('access content')) {
-        // Retrieve a list of new users who have subsequently accessed the site successfully.
-        $new_count = isset($settings['new_count']) ? $settings['new_count'] : 5;
-        $items = db_query_range('SELECT uid, name FROM {users} WHERE status <> 0 AND access <> 0 ORDER BY created DESC', 0, $new_count)->fetchAll();
-        $output = theme('user_list', array('users' => $items));
-
-        $block['subject'] = t('Who\'s new');
-        $block['content'] = $output;
-      }
-      return $block;
-
-    case 'online':
-      if (user_access('access content')) {
-        // Count users active within the defined period.
-        $seconds = isset($settings['seconds_online']) ? $settings['seconds_online'] : 900;
-        $interval = REQUEST_TIME - $seconds;
-
-        // Perform database queries to gather online user lists. We use s.timestamp
-        // rather than u.access because it is much faster.
-        $authenticated_count = db_query("SELECT COUNT(DISTINCT s.uid) FROM {sessions} s WHERE s.timestamp >= :timestamp AND s.uid > 0", array(':timestamp' => $interval))->fetchField();
-
-        $output = '<p>' . format_plural($authenticated_count, 'There is currently 1 user online.', 'There are currently @count users online.') . '</p>';
-
-        // Display a list of currently online users.
-        $max_users = isset($settings['list_count']) ? $settings['list_count'] : 10;
-        if ($authenticated_count && $max_users) {
-          $items = db_query_range('SELECT u.uid, u.name, MAX(s.timestamp) AS max_timestamp FROM {users} u INNER JOIN {sessions} s ON u.uid = s.uid WHERE s.timestamp >= :interval AND s.uid > 0 GROUP BY u.uid, u.name ORDER BY max_timestamp DESC', 0, $max_users, array(':interval' => $interval))->fetchAll();
-          $output .= theme('user_list', array('users' => $items));
-        }
-
-        $block['subject'] = t('Who\'s online');
-        $block['content'] = $output;
       }
       return $block;
   }
@@ -1398,30 +1311,20 @@ function user_menu() {
     'file' => 'user.pages.inc',
   );
 
-  // User listing pages.
-  $items['admin/people'] = array(
-    'title' => 'People',
-    'description' => 'Manage user accounts, roles, and permissions.',
-    'page callback' => 'user_admin',
-    'access arguments' => array('administer users'),
-    'position' => 'left',
-    'weight' => -7,
-    'file' => 'user.admin.inc',
-  );
-  $items['admin/people/list'] = array(
-    'title' => 'Find user accounts',
-    'description' => 'Find and manage people interacting with your site.',
-    'access arguments' => array('administer users'),
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-    'weight' => -10,
-    'file' => 'user.admin.inc',
-  );
   $items['admin/people/create'] = array(
     'title' => 'Add user account',
     'page callback' => 'backdrop_get_form',
     'page arguments' => array('user_register_form'),
     'access arguments' => array('administer users'),
     'type' => MENU_LOCAL_ACTION,
+  );
+  $items['admin/people/cancel'] = array(
+    'title' => 'Cancel user accounts',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('user_multiple_cancel_confirm'),
+    'access arguments' => array('administer users'),
+    'file' => 'user.admin.inc',
+    'type' => MENU_CALLBACK,
   );
 
   // Administration pages.
@@ -1651,17 +1554,6 @@ function user_admin_paths() {
     'user/*/edit/*' => TRUE,
   );
   return $paths;
-}
-
-/**
- * Returns $arg or the user ID of the current user if $arg is '%' or empty.
- *
- * Deprecated. Use %user_uid_optional instead.
- *
- * @todo D8: Remove.
- */
-function user_uid_only_optional_to_arg($arg) {
-  return user_uid_optional_to_arg($arg);
 }
 
 /**
@@ -2258,12 +2150,7 @@ function user_build_content($account, $view_mode = 'full', $langcode = NULL) {
   $account->content = array();
 
   // Allow modules to change the view mode.
-  $context = array(
-    'entity_type' => 'user',
-    'entity' => $account,
-    'langcode' => $langcode,
-  );
-  backdrop_alter('entity_view_mode', $view_mode, $context);
+  $view_mode = key(entity_view_mode_prepare('user', array($account->uid => $account), $view_mode, $langcode));
 
   // Build fields content.
   field_attach_prepare_view('user', array($account->uid => $account), $view_mode, $langcode);
@@ -2735,102 +2622,6 @@ function user_multiple_role_edit($accounts, $operation, $role_name) {
   }
 }
 
-function user_multiple_cancel_confirm($form, &$form_state) {
-  $edit = $form_state['input'];
-
-  $form['accounts'] = array('#prefix' => '<ul>', '#suffix' => '</ul>', '#tree' => TRUE);
-  $accounts = user_load_multiple(array_keys(array_filter($edit['accounts'])));
-  foreach ($accounts as $uid => $account) {
-    // Prevent user 1 from being canceled.
-    if ($uid <= 1) {
-      continue;
-    }
-    $form['accounts'][$uid] = array(
-      '#type' => 'hidden',
-      '#value' => $uid,
-      '#prefix' => '<li>',
-      '#suffix' => check_plain($account->name) . "</li>\n",
-    );
-  }
-
-  // Output a notice that user 1 cannot be canceled.
-  if (isset($accounts[1])) {
-    $redirect = (count($accounts) == 1);
-    $message = t('The user account %name cannot be cancelled.', array('%name' => $accounts[1]->name));
-    backdrop_set_message($message, $redirect ? 'error' : 'warning');
-    // If only user 1 was selected, redirect to the overview.
-    if ($redirect) {
-      backdrop_goto('admin/people');
-    }
-  }
-
-  $form['operation'] = array('#type' => 'hidden', '#value' => 'cancel');
-
-  module_load_include('inc', 'user', 'user.pages');
-  $form['user_cancel_method'] = array(
-    '#type' => 'item',
-    '#title' => t('When cancelling these accounts'),
-  );
-  $form['user_cancel_method'] += user_cancel_methods();
-  // Remove method descriptions.
-  foreach (element_children($form['user_cancel_method']) as $element) {
-    unset($form['user_cancel_method'][$element]['#description']);
-  }
-
-  // Allow to send the account cancellation confirmation mail.
-  $form['user_cancel_confirm'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Require e-mail confirmation to cancel account.'),
-    '#default_value' => FALSE,
-    '#description' => t('When enabled, the user must confirm the account cancellation via e-mail.'),
-  );
-  // Also allow to send account canceled notification mail, if enabled.
-  $form['user_cancel_notify'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Notify user when account is canceled.'),
-    '#default_value' => FALSE,
-    '#access' => config_get('system.core', 'user_mail_status_canceled_notify'),
-    '#description' => t('When enabled, the user will receive an e-mail notification after the account has been cancelled.'),
-  );
-
-  return confirm_form($form,
-                      t('Are you sure you want to cancel these user accounts?'),
-                      'admin/people', t('This action cannot be undone.'),
-                      t('Cancel accounts'), t('Cancel'));
-}
-
-/**
- * Submit handler for mass-account cancellation form.
- *
- * @see user_multiple_cancel_confirm()
- * @see user_cancel_confirm_form_submit()
- */
-function user_multiple_cancel_confirm_submit($form, &$form_state) {
-  global $user;
-
-  if ($form_state['values']['confirm']) {
-    foreach ($form_state['values']['accounts'] as $uid => $value) {
-      // Prevent programmatic form submissions from cancelling user 1.
-      if ($uid <= 1) {
-        continue;
-      }
-      // Prevent user administrators from deleting themselves without confirmation.
-      if ($uid == $user->uid) {
-        $admin_form_state = $form_state;
-        unset($admin_form_state['values']['user_cancel_confirm']);
-        // The $user global is not a complete user entity, so load the full
-        // entity.
-        $admin_form_state['values']['_account'] = user_load($user->uid);
-        user_cancel_confirm_form_submit(array(), $admin_form_state);
-      }
-      else {
-        user_cancel($form_state['values'], $uid, $form_state['values']['user_cancel_method']);
-      }
-    }
-  }
-  $form_state['redirect'] = 'admin/people';
-}
-
 /**
  * List user administration filters that can be applied.
  */
@@ -3119,25 +2910,55 @@ function user_image_style_save($style) {
  * Implements hook_action_info().
  */
 function user_action_info() {
-  return array(
-    'user_block_user_action' => array(
-      'label' => t('Block user(s)'),
-      'type' => 'user',
-    ),
+  $actions['user_block_user_action'] = array(
+    'label' => t('Block user(s)'),
+    'type' => 'user',
+    'callback' => 'user_block_user_action',
+    'file' => 'user.actions.inc',
+    'weight' => -2,
   );
-}
+  $actions['user_unblock_user_action'] = array(
+    'label' => t('Unblock user(s)'),
+    'type' => 'user',
+    'callback' => 'user_unblock_user_action',
+    'file' => 'user.actions.inc',
+    'weight' => -1,
+  );
+  $actions['user_cancel_user_action'] = array(
+    'label' => t('Cancel user account(s)'),
+    'type' => 'user',
+    'callback' => 'user_cancel_user_action',
+    'file' => 'user.actions.inc',
+    'weight' => 10,
+  );
 
-/**
- * Blocks a specific user or the current user, if one is not specified.
- *
- * @param User $account
- *   The user entity whose account will be blocked.
- *
- * @ingroup actions
- */
-function user_block_user_action(User $account, $context = array()) {
-  $account->status = 0;
-  $account->save();
+  $roles = user_roles(TRUE);
+  $index = 0;
+  foreach ($roles as $role_name => $role_label) {
+    if ($role_name === BACKDROP_AUTHENTICATED_ROLE) {
+      continue;
+    }
+    $index++;
+
+    $actions['user_add_role_' . $role_name] = array(
+      'label' => t('Add role "@label"', array('@label' => $role_label)),
+      'type' => 'user',
+      'callback' => 'user_add_role_action',
+      'file' => 'user.actions.inc',
+      'weight' => 120 + $index,
+      'role_name' => $role_name,
+    );
+    $actions['user_remove_role_' . $role_name] = array(
+      'label' => t('Remove role "@label"', array('@label' => $role_label)),
+      'type' => 'user',
+      'callback' => 'user_remove_role_action',
+      'file' => 'user.actions.inc',
+      'weight' => 150 + $index,
+      'role_name' => $role_name,
+    );
+  }
+
+  return $actions;
 }
 
 /**
@@ -3206,8 +3027,8 @@ function user_register_form($form, &$form_state) {
   // inside the submit function interferes with form processing and breaks
   // hook_form_alter().
   $form['administer_users'] = array(
-     '#type' => 'value',
-     '#value' => $admin,
+    '#type' => 'value',
+    '#value' => $admin,
   );
 
   // If we aren't admin but already logged on, go to the user page instead.

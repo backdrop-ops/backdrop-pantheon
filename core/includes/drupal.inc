@@ -16,54 +16,54 @@
 /**
  * The current system version.
  */
-const VERSION = '7.0-dev';
+define('VERSION', '7.0-dev');
 
 /**
  * Core API compatibility.
  */
-const DRUPAL_CORE_COMPATIBILITY = '7.x';
+define('DRUPAL_CORE_COMPATIBILITY', '7.x');
 
 // Constants from bootstrap.inc.
-const DRUPAL_ROOT = BACKDROP_ROOT;
-const DRUPAL_BOOTSTRAP_CONFIGURATION = BACKDROP_BOOTSTRAP_CONFIGURATION;
-const DRUPAL_BOOTSTRAP_PAGE_CACHE = BACKDROP_BOOTSTRAP_PAGE_CACHE;
-const DRUPAL_BOOTSTRAP_DATABASE = BACKDROP_BOOTSTRAP_DATABASE;
-const DRUPAL_BOOTSTRAP_VARIABLES = BACKDROP_BOOTSTRAP_VARIABLES;
-const DRUPAL_BOOTSTRAP_SESSION = BACKDROP_BOOTSTRAP_SESSION;
-const DRUPAL_BOOTSTRAP_PAGE_HEADER = BACKDROP_BOOTSTRAP_PAGE_HEADER;
-const DRUPAL_BOOTSTRAP_LANGUAGE = BACKDROP_BOOTSTRAP_LANGUAGE;
-const DRUPAL_BOOTSTRAP_FULL = BACKDROP_BOOTSTRAP_FULL;
-const DRUPAL_ANONYMOUS_RID = BACKDROP_ANONYMOUS_ROLE;
-const DRUPAL_AUTHENTICATED_RID = BACKDROP_AUTHENTICATED_ROLE;
-const DRUPAL_KILOBYTE = BACKDROP_KILOBYTE;
-const DRUPAL_PHP_FUNCTION_PATTERN = BACKDROP_PHP_FUNCTION_PATTERN;
-const DRUPAL_MINIMUM_PHP = BACKDROP_MINIMUM_PHP;
-const DRUPAL_MINIMUM_PHP_MEMORY_LIMIT = BACKDROP_MINIMUM_PHP_MEMORY_LIMIT;
+define('DRUPAL_ROOT', BACKDROP_ROOT);
+define('DRUPAL_BOOTSTRAP_CONFIGURATION', BACKDROP_BOOTSTRAP_CONFIGURATION);
+define('DRUPAL_BOOTSTRAP_PAGE_CACHE', BACKDROP_BOOTSTRAP_PAGE_CACHE);
+define('DRUPAL_BOOTSTRAP_DATABASE', BACKDROP_BOOTSTRAP_DATABASE);
+define('DRUPAL_BOOTSTRAP_VARIABLES', BACKDROP_BOOTSTRAP_VARIABLES);
+define('DRUPAL_BOOTSTRAP_SESSION', BACKDROP_BOOTSTRAP_SESSION);
+define('DRUPAL_BOOTSTRAP_PAGE_HEADER', BACKDROP_BOOTSTRAP_PAGE_HEADER);
+define('DRUPAL_BOOTSTRAP_LANGUAGE', BACKDROP_BOOTSTRAP_LANGUAGE);
+define('DRUPAL_BOOTSTRAP_FULL', BACKDROP_BOOTSTRAP_FULL);
+define('DRUPAL_ANONYMOUS_RID', BACKDROP_ANONYMOUS_ROLE);
+define('DRUPAL_AUTHENTICATED_RID', BACKDROP_AUTHENTICATED_ROLE);
+define('DRUPAL_KILOBYTE', BACKDROP_KILOBYTE);
+define('DRUPAL_PHP_FUNCTION_PATTERN', BACKDROP_PHP_FUNCTION_PATTERN);
+define('DRUPAL_MINIMUM_PHP', BACKDROP_MINIMUM_PHP);
+define('DRUPAL_MINIMUM_PHP_MEMORY_LIMIT', BACKDROP_MINIMUM_PHP_MEMORY_LIMIT);
 
 // Constants from common.inc.
-const DRUPAL_NO_CACHE = -1;
-const DRUPAL_CACHE_CUSTOM = -2;
-const DRUPAL_CACHE_PER_ROLE = 0x0001;
-const DRUPAL_CACHE_PER_USER = 0x0002;
-const DRUPAL_CACHE_PER_PAGE = 0x0004;
-const DRUPAL_CACHE_GLOBAL = 0x0008;
+define('DRUPAL_NO_CACHE', -1);
+define('DRUPAL_CACHE_CUSTOM', -2);
+define('DRUPAL_CACHE_PER_ROLE', 0x0001);
+define('DRUPAL_CACHE_PER_USER', 0x0002);
+define('DRUPAL_CACHE_PER_PAGE', 0x0004);
+define('DRUPAL_CACHE_GLOBAL', 0x0008);
 
 // Constants from password.inc.
-const DRUPAL_HASH_COUNT = 16;
-const DRUPAL_MIN_HASH_COUNT = 7;
-const DRUPAL_MAX_HASH_COUNT = 30;
-const DRUPAL_HASH_LENGTH = 55;
+define('DRUPAL_HASH_COUNT', 16);
+define('DRUPAL_MIN_HASH_COUNT', 7);
+define('DRUPAL_MAX_HASH_COUNT', 30);
+define('DRUPAL_HASH_LENGTH', 55);
 
 // Constants from system.module.
-const DRUPAL_MAXIMUM_TEMP_FILE_AGE = 21600;
-const DRUPAL_CRON_DEFAULT_THRESHOLD = 10800;
-const DRUPAL_USER_TIMEZONE_DEFAULT = 0;
-const DRUPAL_USER_TIMEZONE_EMPTY = 1;
-const DRUPAL_USER_TIMEZONE_SELECT = 2;
-const DRUPAL_DISABLED = 0;
-const DRUPAL_OPTIONAL = 1;
-const DRUPAL_REQUIRED = 2;
-const DRUPAL_WEIGHT_SELECT_MAX = 100;
+define('DRUPAL_MAXIMUM_TEMP_FILE_AGE', 21600);
+define('DRUPAL_CRON_DEFAULT_THRESHOLD', 10800);
+define('DRUPAL_USER_TIMEZONE_DEFAULT', 0);
+define('DRUPAL_USER_TIMEZONE_EMPTY', 1);
+define('DRUPAL_USER_TIMEZONE_SELECT', 2);
+define('DRUPAL_DISABLED', 0);
+define('DRUPAL_OPTIONAL', 1);
+define('DRUPAL_REQUIRED', 2);
+define('DRUPAL_WEIGHT_SELECT_MAX', 100);
 
 // Functions from bootstrap.inc.
 function drupal_override_server_variables($variables = array()) {
@@ -564,6 +564,16 @@ function drupal_get_updaters() {
 function drupal_get_filetransfer_info() {
   return backdrop_get_filetransfer_info();
 }
+
+/**
+ * Format a username.
+ *
+ * @deprecated since 1.0
+ */
+function format_username($account) {
+  return user_format_name($account);
+}
+
 // Functions from errors.inc.
 function drupal_error_levels() {
   return backdrop_error_levels();
@@ -735,7 +745,7 @@ function drupal_match_path($path, $patterns) {
   return backdrop_match_path($path, $patterns);
 }
 function drupal_path_alias_whitelist_rebuild($source = NULL) {
-  return backdrop_path_alias_whitelist_rebuild($source);
+  return;
 }
 function drupal_valid_path($path, $dynamic_allowed = FALSE) {
   return backdrop_valid_path($path, $dynamic_allowed);
@@ -886,6 +896,40 @@ function system_settings_form_submit($form, &$form_state) {
   }
 
   backdrop_set_message(t('The configuration options have been saved.'));
+}
+
+/**
+ * Alters Backdrop's list of defined date formats and attributes to return the
+ * expected date types and attributes for Drupal's system_get_date_types()
+ * function.
+ *
+ * @deprecated since 1.0
+ */
+function system_get_date_types($type = NULL) {
+  $formats = system_get_date_formats($type);
+
+  if ($type) {
+    foreach ($formats as &$format) {
+      $format['type'] = $format['name'];
+      $format['title'] = $format['label'];
+      $format['locked'] = isset($format['hidden']) ? $format['hidden'] : '0';
+      if (!isset($format['module'])) {
+        $format['module'] = '';
+      }
+      $format['is_new'] = FALSE;
+    }
+  }
+  else {
+    $formats['type'] = $formats['name'];
+    $formats['title'] = $formats['label'];
+    $formats['locked'] = isset($formats['hidden']) ? $formats['hidden'] : '0';
+    if (!isset($formats['module'])) {
+      $formats['module'] = '';
+    }
+    $formats['is_new'] = FALSE;
+  }
+
+  return $formats;
 }
 
 /**

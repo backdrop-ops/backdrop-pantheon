@@ -11,62 +11,62 @@
 /**
  * Comment is awaiting approval.
  */
-const COMMENT_NOT_PUBLISHED = 0;
+define('COMMENT_NOT_PUBLISHED', 0);
 
 /**
  * Comment is published.
  */
-const COMMENT_PUBLISHED = 1;
+define('COMMENT_PUBLISHED', 1);
 
 /**
  * Comments are displayed in a flat list - expanded.
  */
-const COMMENT_MODE_FLAT = 0;
+define('COMMENT_MODE_FLAT', 0);
 
 /**
  * Comments are displayed as a threaded list - expanded.
  */
-const COMMENT_MODE_THREADED = 1;
+define('COMMENT_MODE_THREADED', 1);
 
 /**
  * Anonymous posters cannot enter their contact information.
  */
-const COMMENT_ANONYMOUS_MAYNOT_CONTACT = 0;
+define('COMMENT_ANONYMOUS_MAYNOT_CONTACT', 0);
 
 /**
  * Anonymous posters may leave their contact information.
  */
-const COMMENT_ANONYMOUS_MAY_CONTACT = 1;
+define('COMMENT_ANONYMOUS_MAY_CONTACT', 1);
 
 /**
  * Anonymous posters are required to leave their contact information.
  */
-const COMMENT_ANONYMOUS_MUST_CONTACT = 2;
+define('COMMENT_ANONYMOUS_MUST_CONTACT', 2);
 
 /**
  * Comment form should be displayed on a separate page.
  */
-const COMMENT_FORM_SEPARATE_PAGE = 0;
+define('COMMENT_FORM_SEPARATE_PAGE', 0);
 
 /**
  * Comment form should be shown below post or list of comments.
  */
-const COMMENT_FORM_BELOW = 1;
+define('COMMENT_FORM_BELOW', 1);
 
 /**
  * Comments for this node are hidden.
  */
-const COMMENT_NODE_HIDDEN = 0;
+define('COMMENT_NODE_HIDDEN', 0);
 
 /**
  * Comments for this node are closed.
  */
-const COMMENT_NODE_CLOSED = 1;
+define('COMMENT_NODE_CLOSED', 1);
 
 /**
  * Comments for this node are open.
  */
-const COMMENT_NODE_OPEN = 2;
+define('COMMENT_NODE_OPEN', 2);
 
 /**
  * Implements hook_entity_info().
@@ -1005,12 +1005,7 @@ function comment_build_content(Comment $comment, Node $node, $view_mode = 'full'
   $comment->content = array();
 
   // Allow modules to change the view mode.
-  $context = array(
-    'entity_type' => 'comment',
-    'entity' => $comment,
-    'langcode' => $langcode,
-  );
-  backdrop_alter('entity_view_mode', $view_mode, $context);
+  $view_mode = key(entity_view_mode_prepare('comment', array($comment->cid => $comment), $view_mode, $langcode));
 
   // Build fields content.
   field_attach_prepare_view('comment', array($comment->cid => $comment), $view_mode, $langcode);
@@ -1121,17 +1116,25 @@ function comment_links(Comment $comment, Node $node) {
  * @see backdrop_render()
  */
 function comment_view_multiple($comments, Node $node, $view_mode = 'full', $weight = 0, $langcode = NULL) {
-  field_attach_prepare_view('comment', $comments, $view_mode, $langcode);
-  entity_prepare_view('comment', $comments, $langcode);
+  $build = array();
+  $entities_by_view_mode = entity_view_mode_prepare('comment', $comments, $view_mode, $langcode);
+  foreach ($entities_by_view_mode as $entity_view_mode => $entities) {
+    field_attach_prepare_view('comment', $entities, $entity_view_mode, $langcode);
+    entity_prepare_view('comment', $entities, $langcode);
 
-  $build = array(
-    '#sorted' => TRUE,
-  );
+    foreach ($entities as $entity) {
+      $build[$entity->cid] = comment_view($entity, $node, $entity_view_mode, $langcode);
+    }
+  }
   foreach ($comments as $comment) {
-    $build[$comment->cid] = comment_view($comment, $node, $view_mode, $langcode);
     $build[$comment->cid]['#weight'] = $weight;
     $weight++;
   }
+  // Sort here, to preserve the input order of the entities that were passed to
+  // this function.
+  uasort($build, 'element_sort');
+  $build['#sorted'] = TRUE;
+
   return $build;
 }
 
@@ -1547,8 +1550,6 @@ function comment_delete_multiple($cids) {
  *
  * @return
  *   An array of comment objects, indexed by comment ID.
- *
- * @todo Remove $conditions in Drupal 8.
  *
  * @see entity_load()
  * @see EntityFieldQuery

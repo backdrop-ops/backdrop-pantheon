@@ -914,7 +914,7 @@ function backdrop_process_form($form_id, &$form, &$form_state) {
       // We'll clear out the cached copies of the form and its stored data
       // here, as we've finished with them. The in-memory copies are still
       // here, though.
-      if (!config_get('system.core', 'cache') && !empty($form_state['values']['form_build_id'])) {
+      if (empty($form_state['no_cache']) && !empty($form_state['values']['form_build_id']) && !config_get('system.core', 'cache')) {
         tempstore_clear('form', $form_state['values']['form_build_id']);
         tempstore_clear('form_state', $form_state['values']['form_build_id']);
       }
@@ -970,7 +970,7 @@ function backdrop_process_form($form_id, &$form, &$form_state) {
     // identical form without an error for the user to correct, so we also
     // rebuild error-free non-executed forms, regardless of
     // $form_state['rebuild'].
-    // @todo D8: Simplify this logic; considering Ajax and non-HTML front-ends,
+    // @todo Simplify this logic; considering Ajax and non-HTML front-ends,
     //   along with element-level #submit properties, it makes no sense to have
     //   divergent form execution based on whether the triggering element has
     //   #executes_submit_callback set to TRUE.
@@ -2707,17 +2707,43 @@ function theme_select($variables) {
 }
 
 /**
- * Converts a select form element's options array into HTML.
+ * Converts an array of options into HTML, for use in select list form elements.
  *
- * @param $element
- *   An associative array containing the properties of the element.
- * @param $choices
- *   Mixed: Either an associative array of items to list as choices, or an
- *   object with an 'option' member that is an associative array. This
- *   parameter is only used internally and should not be passed.
+ * This function calls itself recursively to obtain the values for each optgroup
+ * within the list of options and when the function encounters an object with
+ * an 'options' property inside $element['#options'].
  *
- * @return
- *   An HTML string of options for the select form element.
+ * @param array $element
+ *   An associative array containing the following key-value pairs:
+ *   - #multiple: Optional Boolean indicating if the user may select more than
+ *     one item.
+ *   - #options: An associative array of options to render as HTML. Each array
+ *     value can be a string, an array, or an object with an 'option' property:
+ *     - A string or integer key whose value is a translated string is
+ *       interpreted as a single HTML option element. Do not use placeholders
+ *       that sanitize data: doing so will lead to double-escaping. Note that
+ *       the key will be visible in the HTML and could be modified by malicious
+ *       users, so don't put sensitive information in it.
+ *     - A translated string key whose value is an array indicates a group of
+ *       options. The translated string is used as the label attribute for the
+ *       optgroup. Do not use placeholders to sanitize data: doing so will lead
+ *       to double-escaping. The array should contain the options you wish to
+ *       group and should follow the syntax of $element['#options'].
+ *     - If the function encounters a string or integer key whose value is an
+ *       object with an 'option' property, the key is ignored, the contents of
+ *       the option property are interpreted as $element['#options'], and the
+ *       resulting HTML is added to the output.
+ *   - #value: Optional integer, string, or array representing which option(s)
+ *     to pre-select when the list is first displayed. The integer or string
+ *     must match the key of an option in the '#options' list. If '#multiple' is
+ *     TRUE, this can be an array of integers or strings.
+ * @param array|null $choices
+ *   (optional) Either an associative array of options in the same format as
+ *   $element['#options'] above, or NULL. This parameter is only used internally
+ *   and is not intended to be passed in to the initial function call.
+ *
+ * @return string
+ *   An HTML string of options and optgroups for use in a select form element.
  */
 function form_select_options($element, $choices = NULL) {
   if (!isset($choices)) {
@@ -3258,6 +3284,8 @@ function form_process_container($element, &$form_state) {
  */
 function theme_container($variables) {
   $element = $variables['element'];
+  // Ensure #attributes is set.
+  $element += array('#attributes' => array());
 
   // Special handling for form elements.
   if (isset($element['#array_parents'])) {
@@ -3702,8 +3730,7 @@ function form_process_vertical_tabs($element, &$form_state) {
 
   // The JavaScript stores the currently selected tab in this hidden
   // field so that the active tab can be restored the next time the
-  // form is rendered, e.g. on preview pages or when form validation
-  // fails.
+  // form is rendered, e.g. when form validation fails.
   $name = implode('__', $element['#parents']);
   if (isset($form_state['values'][$name . '__active_tab'])) {
     $element['#default_tab'] = $form_state['values'][$name . '__active_tab'];

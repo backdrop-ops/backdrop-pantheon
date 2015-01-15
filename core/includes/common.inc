@@ -42,59 +42,59 @@
 /**
  * Return status for saving which involved creating a new item.
  */
-const SAVED_NEW = 1;
+define('SAVED_NEW', 1);
 
 /**
  * Return status for saving which involved an update to an existing item.
  */
-const SAVED_UPDATED = 2;
+define('SAVED_UPDATED', 2);
 
 /**
  * Return status for saving which deleted an existing item.
  */
-const SAVED_DELETED = 3;
+define('SAVED_DELETED', 3);
 
 /**
  * The default group for system CSS files added to the page.
  */
-const CSS_SYSTEM = -100;
+define('CSS_SYSTEM', -100);
 
 /**
  * The default group for module CSS files added to the page.
  */
-const CSS_DEFAULT = 0;
+define('CSS_DEFAULT', 0);
 
 /**
  * The default group for theme CSS files added to the page.
  */
-const CSS_THEME = 100;
+define('CSS_THEME', 100);
 
 /**
  * The default group for JavaScript and jQuery libraries added to the page.
  */
-const JS_LIBRARY = -100;
+define('JS_LIBRARY', -100);
 
 /**
  * The default group for module JavaScript code added to the page.
  */
-const JS_DEFAULT = 0;
+define('JS_DEFAULT', 0);
 
 /**
  * The default group for theme JavaScript code added to the page.
  */
-const JS_THEME = 100;
+define('JS_THEME', 100);
 
 /**
  * The default group for JavaScript settings added to the page.
  */
-const JS_SETTING = -200;
+define('JS_SETTING', -200);
 
 /**
  * Error code indicating that the request exceeded the specified timeout.
  *
  * @see backdrop_http_request()
  */
-const HTTP_REQUEST_TIMEOUT = -1;
+define('HTTP_REQUEST_TIMEOUT', -1);
 
 /**
  * @defgroup block_caching Block Caching
@@ -129,7 +129,7 @@ const HTTP_REQUEST_TIMEOUT = -1;
  *   content.
  * - For blocks that change too frequently.
  */
-const BACKDROP_NO_CACHE = -1;
+define('BACKDROP_NO_CACHE', -1);
 
 /**
  * The block is handling its own caching in its hook_block_view().
@@ -137,7 +137,7 @@ const BACKDROP_NO_CACHE = -1;
  * This setting is useful when time based expiration is needed or a site uses a
  * node access which invalidates standard block cache.
  */
-const BACKDROP_CACHE_CUSTOM = -2;
+define('BACKDROP_CACHE_CUSTOM', -2);
 
 /**
  * The block or element can change depending on the user's roles.
@@ -145,7 +145,7 @@ const BACKDROP_CACHE_CUSTOM = -2;
  * This is the default setting for blocks, used when the block does not specify
  * anything.
  */
-const BACKDROP_CACHE_PER_ROLE = 0x0001;
+define('BACKDROP_CACHE_PER_ROLE', 0x0001);
 
 /**
  * The block or element can change depending on the user.
@@ -153,17 +153,17 @@ const BACKDROP_CACHE_PER_ROLE = 0x0001;
  * This setting can be resource-consuming for sites with large number of users,
  * and thus should only be used when BACKDROP_CACHE_PER_ROLE is not sufficient.
  */
-const BACKDROP_CACHE_PER_USER = 0x0002;
+define('BACKDROP_CACHE_PER_USER', 0x0002);
 
 /**
  * The block or element can change depending on the page being viewed.
  */
-const BACKDROP_CACHE_PER_PAGE = 0x0004;
+define('BACKDROP_CACHE_PER_PAGE', 0x0004);
 
 /**
  * The block or element is the same for every user and page that it is visible.
  */
-const BACKDROP_CACHE_GLOBAL = 0x0008;
+define('BACKDROP_CACHE_GLOBAL', 0x0008);
 
 /**
  * @} End of "defgroup block_caching".
@@ -230,12 +230,17 @@ function backdrop_get_profile() {
     $profile = $install_state['parameters']['profile'];
   }
   else {
-    $profile = config_get('system.core', 'install_profile');
+    try {
+      $profile = config_get('system.core', 'install_profile');
+    }
+    catch (ConfigException $e) {}
+  }
+  if (empty($profile)) {
+    $profile = 'standard';
   }
 
   return $profile;
 }
-
 
 /**
  * Sets the breadcrumb trail for the current page.
@@ -352,7 +357,7 @@ function backdrop_get_favicon() {
  * arguments (or NULL for both) to retrieve the currently stored elements.
  *
  * @param $data
- *   A renderable array. If the '#type' key is not set then 'html_tag' will be
+ *   A renderable array. If the '#type' key is not set then 'head_tag' will be
  *   added as the default '#type'.
  * @param $key
  *   A unique string key to allow implementations of hook_html_head_alter() to
@@ -361,7 +366,7 @@ function backdrop_get_favicon() {
  * @return
  *   An array of all stored HEAD elements.
  *
- * @see theme_html_tag()
+ * @see theme_head_tag()
  */
 function backdrop_add_html_head($data = NULL, $key = NULL) {
   $stored_head = &backdrop_static(__FUNCTION__);
@@ -373,7 +378,7 @@ function backdrop_add_html_head($data = NULL, $key = NULL) {
 
   if (isset($data) && isset($key)) {
     if (!isset($data['#type'])) {
-      $data['#type'] = 'html_tag';
+      $data['#type'] = 'head_tag';
     }
     $stored_head[$key] = $data;
   }
@@ -388,7 +393,7 @@ function _backdrop_default_html_head() {
   // IE browser may be vulnerable to XSS via encoding attacks from any content
   // that comes before this META tag, such as a TITLE tag.
   $elements['system_meta_content_type'] = array(
-    '#type' => 'html_tag',
+    '#type' => 'head_tag',
     '#tag' => 'meta',
     '#attributes' => array(
       'charset' => 'utf-8',
@@ -400,7 +405,7 @@ function _backdrop_default_html_head() {
   // Get the major version.
   list($version, ) = explode('.', BACKDROP_VERSION);
   $elements['system_meta_generator'] = array(
-    '#type' => 'html_tag',
+    '#type' => 'head_tag',
     '#tag' => 'meta',
     '#attributes' => array(
       'name' => 'Generator',
@@ -420,7 +425,7 @@ function backdrop_get_html_head() {
 
   // Always add the default mobile meta tags.
   $elements['viewport'] = array(
-    '#type' => 'html_tag',
+    '#type' => 'head_tag',
     '#tag' => 'meta',
     '#attributes' => array(
       'name' => 'viewport',
@@ -1066,9 +1071,10 @@ function backdrop_http_request($url, array $options = array()) {
   $response = preg_split("/\r\n|\n|\r/", $response);
 
   // Parse the response status line.
-  list($protocol, $code, $status_message) = explode(' ', trim(array_shift($response)), 3);
-  $result->protocol = $protocol;
-  $result->status_message = $status_message;
+  $response_status_array = _backdrop_parse_response_status(trim(array_shift($response)));
+  $result->protocol = $response_status_array['http_version'];
+  $result->status_message = $response_status_array['reason_phrase'];
+  $code = $response_status_array['response_code'];
 
   $result->headers = array();
 
@@ -1159,9 +1165,41 @@ function backdrop_http_request($url, array $options = array()) {
       }
       break;
     default:
-      $result->error = $status_message;
+      $result->error = $result->status_message;
   }
 
+  return $result;
+}
+
+/**
+ * Split an HTTP response status line into components.
+ *
+ * Refactored out of backdrop_http_request() so it can be unit tested.
+ *
+ * @link http://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html Status line definition @endlink
+ *
+ * @param string $respone
+ *   The response status line, e.g. 'HTTP/1.1 500 Internal Server Error'
+ *
+ * @return array
+ *   Keyed array containing the component parts. If the response is malformed,
+ *   all possible parts will be extracted. 'reason_phrase' could be empty.
+ *   Possible keys:
+ *   - 'http_version'
+ *   - 'response_code'
+ *   - 'reason_phrase'
+ */
+function _backdrop_parse_response_status($response) {
+  $response_array = explode(' ', trim($response), 3);
+  // Set up empty values.
+  $result = array(
+    'reason_phrase' => '',
+  );
+  $result['http_version'] = $response_array[0];
+  $result['response_code'] = $response_array[1];
+  if (isset($response_array[2])) {
+    $result['reason_phrase'] = $response_array[2];
+  }
   return $result;
 }
 
@@ -2429,7 +2467,12 @@ function url($path = NULL, array $options = array()) {
   }
   $clean_url = &$backdrop_static_fast['clean_url'];
   if (!isset($clean_url)) {
-    $clean_url = config_get('system.core', 'clean_url');
+    try {
+      $clean_url = config_get('system.core', 'clean_url') ? TRUE : FALSE;
+    }
+    catch (ConfigException $e) {
+      $clean_url = FALSE;
+    }
   }
 
   // With Clean URLs.
@@ -3451,14 +3494,14 @@ function backdrop_pre_render_styles($elements) {
 
   // Defaults for LINK and STYLE elements.
   $link_element_defaults = array(
-    '#type' => 'html_tag',
+    '#type' => 'head_tag',
     '#tag' => 'link',
     '#attributes' => array(
       'rel' => 'stylesheet',
     ),
   );
   $style_element_defaults = array(
-    '#type' => 'html_tag',
+    '#type' => 'head_tag',
     '#tag' => 'style',
   );
 
@@ -3516,7 +3559,11 @@ function backdrop_pre_render_styles($elements) {
             $import_batch = array_slice($import, 0, 31);
             $import = array_slice($import, 31);
             $element = $style_element_defaults;
-            $element['#value'] = implode("\n", $import_batch);
+            // This simplifies the JavaScript regex, allowing each line
+            // (separated by \n) to be treated as a completely different string.
+            // This means that we can use ^ and $ on one line at a time, and not
+            // worry about style tags since they'll never match the regex.
+            $element['#value'] = "\n" . implode("\n", $import_batch) . "\n";
             $element['#attributes']['media'] = $group['media'];
             $element['#browsers'] = $group['browsers'];
             $elements[] = $element;
@@ -3842,7 +3889,7 @@ function _backdrop_load_stylesheet($matches) {
   // Alter all internal url() paths. Leave external paths alone. We don't need
   // to normalize absolute paths here (i.e. remove folder/... segments) because
   // that will be done later.
-  return preg_replace('/url\(\s*([\'"]?)(?![a-z]+:|\/+)/i', 'url(\1'. $directory, $file);
+  return preg_replace('/url\(\s*([\'"]?)(?![a-z]+:|\/+)([^\'")]+)([\'"]?)\s*\)/i', 'url(\1' . $directory . '\2\3)', $file);
 }
 
 /**
@@ -4450,7 +4497,7 @@ function backdrop_pre_render_scripts($elements) {
 
   // Defaults for each SCRIPT element.
   $element_defaults = array(
-    '#type' => 'html_tag',
+    '#type' => 'head_tag',
     '#tag' => 'script',
     '#value' => '',
     '#attributes' => array(
@@ -7178,7 +7225,7 @@ function backdrop_common_theme() {
     'indentation' => array(
       'variables' => array('size' => 1),
     ),
-    'html_tag' => array(
+    'head_tag' => array(
       'render element' => 'element',
     ),
     // From theme.maintenance.inc.
@@ -7959,7 +8006,7 @@ function debug($data, $label = NULL, $print_r = FALSE) {
  * Parses a dependency for comparison by backdrop_check_incompatibility().
  *
  * @param $dependency
- *   A dependency string, for example 'foo (>=8.x-4.5-beta5, 3.x)'.
+ *   A dependency string, for example 'foo (>=1.x-4.5-beta5, 3.x)'.
  *
  * @return
  *   An associative array with three keys:
@@ -7977,7 +8024,7 @@ function backdrop_parse_dependency($dependency) {
   // We use named subpatterns and support every op that version_compare
   // supports. Also, op is optional and defaults to equals.
   $p_op = '(?P<operation>!=|==|=|<|<=|>|>=|<>)?';
-  // Core version is always optional: 8.x-2.x and 2.x is treated the same.
+  // Core version is always optional: 1.x-2.x and 2.x is treated the same.
   $p_core = '(?:' . preg_quote(BACKDROP_CORE_COMPATIBILITY) . '-)?';
   $p_major = '(?P<major>\d+)';
   // By setting the minor version to x, branches can be matched.

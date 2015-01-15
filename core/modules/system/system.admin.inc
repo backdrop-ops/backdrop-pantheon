@@ -538,6 +538,11 @@ function system_modules($form, $form_state = array()) {
     $extra['enabled'] = (bool) $module->status;
     $extra['disabled'] = (array_key_exists('disabled', $module->info)) ? $module->info['disabled'] : FALSE;
 
+    // Check to see if this is a core module.
+    if (strstr($module->uri, 'core/modules')) {
+      $extra['core'] = TRUE;
+    }
+
     // Some modules are always required by core and cannot be disabled, for
     // example: entity, node, system, and user.
     $extra['required_by_distribution'] = FALSE;
@@ -629,14 +634,12 @@ function system_modules($form, $form_state = array()) {
       '#collapsible' => TRUE,
       '#theme' => 'system_modules_fieldset',
       '#header' => array(
-        array('data' => t('Enabled'), 'class' => array('checkbox')),
+        array('class' => array('checkbox')),
         t('Name'),
         array('data' => t('Version'), 'class' => array(RESPONSIVE_PRIORITY_MEDIUM)),
         array('data' => t('Description'), 'class' => array(RESPONSIVE_PRIORITY_LOW)),
         array('data' => t('Operations')),
       ),
-      // Ensure that the "Core" package fieldset comes first.
-      '#weight' => $package == 'Core' ? -10 : NULL,
     );
   }
 
@@ -684,6 +687,7 @@ function _system_modules_build_row($info, $extra) {
     'disabled' => FALSE,
     'enabled' => FALSE,
     'links' => array(),
+    'core' => FALSE,
   );
   $form = array(
     '#tree' => TRUE,
@@ -1313,13 +1317,13 @@ function system_site_information_settings_validate($form, &$form_state) {
 
   // If the user provided a path for a logo or favicon file, make sure a file
   // exists at that path.
-  if ($form_state['values']['site_logo_path']) {
+  if (!empty($form_state['values']['site_logo_path'])) {
     $path = _system_site_information_settings_validate_path($form_state['values']['site_logo_path']);
     if (!$path) {
       form_set_error('site_logo_path', t('The custom logo path is invalid.'));
     }
   }
-  if ($form_state['values']['site_favicon_path']) {
+  if (!empty($form_state['values']['site_favicon_path'])) {
     $path = _system_site_information_settings_validate_path($form_state['values']['site_favicon_path']);
     if (!$path) {
       form_set_error('site_favicon_path', t('The custom favicon path is invalid.'));
@@ -1395,13 +1399,15 @@ function _system_site_information_settings_validate_path($path) {
 function system_site_information_settings_submit($form, &$form_state) {
   // If the user uploaded a new logo or favicon, save it to a permanent location
   // and use it in place of the default theme-provided file.
-  if ($file = $form_state['values']['site_logo_upload']) {
+  if (!empty($form_state['values']['site_logo_upload'])) {
+    $file = $form_state['values']['site_logo_upload'];
     unset($form_state['values']['site_logo_upload']);
     $filename = file_unmanaged_copy($file->uri);
     $form_state['values']['site_logo_theme'] = 0;
     $form_state['values']['site_logo_path'] = $filename;
   }
-  if ($file = $form_state['values']['site_favicon_upload']) {
+  if (!empty($form_state['values']['site_favicon_upload'])) {
+    $file = $form_state['values']['site_favicon_upload'];
     unset($form_state['values']['site_favicon_upload']);
     $filename = file_unmanaged_copy($file->uri);
     $form_state['values']['site_favicon_theme'] = 0;
@@ -2376,7 +2382,7 @@ function theme_status_report($variables) {
     ),
     REQUIREMENT_OK => array(
       'title' => t('OK'),
-      'class' => 'ok',
+      'class' => 'status',
     ),
     REQUIREMENT_WARNING => array(
       'title' => t('Warning'),

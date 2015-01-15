@@ -78,7 +78,7 @@
  *       'wrapper' => 'replace_textfield_div',
  *      ),
  *   );
-
+ *
  *   // This entire form element will be replaced with an updated value.
  *   $form['replace_textfield'] = array(
  *     '#type' => 'textfield',
@@ -272,7 +272,7 @@ function ajax_render($commands = array()) {
 
   $extra_commands = array();
   if (!empty($styles)) {
-    $extra_commands[] = ajax_command_prepend('head', $styles);
+    $extra_commands[] = ajax_command_add_css($styles);
   }
   if (!empty($scripts_header)) {
     $extra_commands[] = ajax_command_prepend('head', $scripts_header);
@@ -288,7 +288,7 @@ function ajax_render($commands = array()) {
   $scripts = backdrop_add_js();
   if (!empty($scripts['settings'])) {
     $settings = $scripts['settings'];
-    array_unshift($commands, ajax_command_settings(call_user_func_array('array_merge_recursive', $settings['data']), TRUE));
+    array_unshift($commands, ajax_command_settings(backdrop_array_merge_deep_array($settings['data']), TRUE));
   }
 
   // Allow modules to alter any Ajax response.
@@ -1434,5 +1434,28 @@ function ajax_command_update_build_id($form) {
     'command' => 'updateBuildId',
     'old' => $form['#build_id_old'],
     'new' => $form['#build_id'],
+  );
+}
+
+/**
+ * Creates a Backdrop Ajax 'addCss' command.
+ *
+ * This method will add css via ajax in a cross-browser compatible way.
+ *
+ * This command is implemented by Backdrop.ajax.prototype.commands.add_css()
+ * defined in misc/ajax.js.
+ *
+ * @param $styles
+ *   A string that contains the styles to be added.
+ *
+ * @return
+ *   An array suitable for use with the ajax_render() function.
+ *
+ * @see misc/ajax.js
+ */
+function ajax_command_add_css($styles) {
+  return array(
+    'command' => 'addCss',
+    'data' => $styles,
   );
 }

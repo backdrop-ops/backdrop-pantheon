@@ -262,6 +262,12 @@ description = Performs tests on Backdrop's HTTP request mechanism.
 group = Common
 file = tests/common.test
 
+[CommonBackdropHTTPResponseStatusLineTest]
+name = Backdrop HTTP Response Status
+description = Performs unit tests on Backdrop's HTTP Response Status.
+group = Common
+file = tests/common.test
+
 [CommonBackdropGotoTestCase]
 name = Redirect functionality
 description = Tests the backdrop_goto() and hook_backdrop_goto_alter() functionality.
@@ -1090,9 +1096,15 @@ description = Test that autocompletion does not load the registry.
 group = Theme
 file = tests/theme.test
 
-[ThemeHtmlTag]
-name = Theme HTML Tag
-description = Tests theme_html_tag() built-in theme functions.
+[ThemeHeadTag]
+name = Theme Head Tag
+description = Tests theme_head_tag() built-in theme function.
+group = Theme
+file = tests/theme.test
+
+[RenderElementTypesTestCase]
+name = Render element types
+description = Tests the markup of core render element types passed to drupal_render().
 group = Theme
 file = tests/theme.test
 
@@ -1161,3 +1173,9 @@ name = Language upgrade test
 description = Upgrade tests with language data.
 group = Upgrade path
 file = tests/upgrade/upgrade.language.test
+
+[ThemeDebugMarkupTestCase]
+name = Theme debug markup
+description = Tests theme debug markup output.
+group = Theme
+file = tests/theme.test
