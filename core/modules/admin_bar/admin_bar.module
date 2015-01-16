@@ -55,15 +55,17 @@ function admin_bar_permission() {
  * Implements hook_theme().
  */
 function admin_bar_theme() {
+  $base = array(
+    'file' => 'admin_bar.theme.inc',
+  );
+
   return array(
     'admin_bar_links' => array(
       'render element' => 'elements',
-      'file' => 'admin_bar.inc',
-    ),
+    ) + $base,
     'admin_bar_icon' => array(
       'variables' => array('src' => NULL, 'alt' => NULL),
-      'file' => 'admin_bar.inc',
-    ),
+    ) + $base,
   );
 }
 
@@ -143,7 +145,7 @@ function admin_bar_preprocess_page(&$variables) {
   $options = array('every_page' => TRUE);
 
   backdrop_add_css($path . '/css/admin_bar.css', $options);
-  backdrop_add_js($path . '/admin_bar.js', $options);
+  backdrop_add_js($path . '/js/admin_bar.js', $options);
 
   // Add current path to support menu item highlighting.
   $args = explode('/', $_GET['q']);
@@ -159,9 +161,6 @@ function admin_bar_preprocess_page(&$variables) {
 
   // Determine whether we need to show all components and disable all caches.
   $complete = FALSE;
-  if (current_path() == 'admin/config/administration/admin_bar' && $_SERVER['REQUEST_METHOD'] == 'GET') {
-    $complete = TRUE;
-  }
 
   // If we have a cached menu for the current user, only output the hash for the
   // client-side HTTP cache callback URL.
@@ -452,10 +451,12 @@ function admin_bar_admin_bar_output_build(&$content) {
  * Implements hook_admin_bar_output_alter().
  */
 function admin_bar_admin_bar_output_alter(&$content) {
-  foreach ($content['menu']['menu'] as $key => $link) {
-    // Move local tasks on 'admin' into icon menu.
-    if ($key == 'admin/tasks' || $key == 'admin/index') {
-      unset($content['menu']['menu'][$key]);
+  if (isset($content['menu']['menu'])) {
+    foreach ($content['menu']['menu'] as $key => $link) {
+      // Move local tasks on 'admin' into icon menu.
+      if ($key == 'admin/tasks' || $key == 'admin/index') {
+        unset($content['menu']['menu'][$key]);
+      }
     }
   }
 }
@@ -528,7 +529,7 @@ function admin_bar_form_alter(&$form, &$form_state, $form_id) {
   // auto-enable the 'access administration bar' permission along with
   // 'access administration pages'.
   if ($form_id == 'user_admin_permissions') {
-    $form['#attached']['js'][] = backdrop_get_path('module', 'admin_bar') . '/admin_bar.admin.js';
+    $form['#attached']['js'][] = backdrop_get_path('module', 'admin_bar') . '/js/admin_bar.admin.js';
   }
 }
 

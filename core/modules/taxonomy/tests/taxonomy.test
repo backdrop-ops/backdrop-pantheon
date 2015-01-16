@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Tests for taxonomy.module.
@@ -517,12 +516,6 @@ class TaxonomyTermTestCase extends TaxonomyWebTestCase {
 
     $this->backdropGet('node/' . $node->nid);
     $this->assertText($term2->name, 'Term is displayed when viewing the node.');
-
-    // Preview the node.
-    $this->backdropPost('node/' . $node->nid . '/edit', $edit, t('Preview'));
-    $this->assertNoUniqueText($term2->name, 'Term is displayed when previewing the node.');
-    $this->backdropPost(NULL, NULL, t('Preview'));
-    $this->assertNoUniqueText($term2->name, 'Term is displayed when previewing the node again.');
   }
 
   /**
@@ -548,14 +541,6 @@ class TaxonomyTermTestCase extends TaxonomyWebTestCase {
     // Insert the terms in a comma separated list. Vocabulary 1 is a
     // free-tagging field created by the default profile.
     $edit[$instance['field_name'] . "[$langcode]"] = backdrop_implode_tags($terms);
-
-    // Preview and verify the terms appear but are not created.
-    $this->backdropPost('node/add/page', $edit, t('Preview'));
-    foreach ($terms as $term) {
-      $this->assertText($term, 'The term appears on the node preview.');
-    }
-    $tree = taxonomy_get_tree($this->vocabulary->machine_name);
-    $this->assertTrue(empty($tree), 'The terms are not created on preview.');
 
     // taxonomy.module does not maintain its static caches.
     backdrop_static_reset();
@@ -1235,6 +1220,7 @@ class TaxonomyHooksTestCase extends TaxonomyWebTestCase {
     // View the term and ensure that hook_taxonomy_term_view() and
     // hook_entity_view() are invoked.
     $term = taxonomy_term_load($term->tid);
+    module_load_include('inc', 'taxonomy', 'taxonomy.pages');
     $term_build = taxonomy_term_page($term);
     $this->assertFalse(empty($term_build['term_heading']['term']['taxonomy_test_term_view_check']), 'hook_taxonomy_term_view() was invoked when viewing the term.');
     $this->assertFalse(empty($term_build['term_heading']['term']['taxonomy_test_entity_view_check']), 'hook_entity_view() was invoked when viewing the term.');

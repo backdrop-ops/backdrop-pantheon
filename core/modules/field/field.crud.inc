@@ -222,15 +222,15 @@ function field_update_field($field) {
 function field_validate_field($field, $update = FALSE) {
   // Field name is required.
   if (empty($field['field_name'])) {
-    throw new FieldException(t('A field was attempted to be created, but no name was specified.'));
+    throw new FieldException(format_string('Attempt to create field @field_name with no type.', array('@field_name' => $field['field_name'])));
   }
   // Field type is required.
   if (empty($field['type'])) {
-    throw new FieldException(t('The field "@name" did not specify a field type.', array('@name' => $field['field_name'])));
+    throw new FieldException(format_string('The field "@name" did not specify a field type.', array('@name' => $field['field_name'])));
   }
   // Field name cannot contain invalid characters.
   if (!preg_match('/^[_a-z]+[_a-z0-9]*$/', $field['field_name'])) {
-    throw new FieldException(t('The field "@name" contains invalid characters. Only lowercase alphanumeric characters and underscores are allowed, and only lowercase letters and underscore are allowed as the first character.', array('@name' => $field['field_name'])));
+    throw new FieldException(format_string('Attempt to create a field @field_name with invalid characters. Only lowercase alphanumeric characters and underscores are allowed, and only lowercase letters and underscore are allowed as the first character', array('@field_name' => $field['field_name'])));
   }
 
   // Validations that only apply to newly created fields.
@@ -321,15 +321,24 @@ function field_read_fields($params = array(), $include_additional = array()) {
 
   $prefix = 'field.field.';
   if (isset($params['field_name'])) {
-    $prefix .= $params['field_name'];
-    unset($params['field_name']);
+    $config_names = array($prefix . $params['field_name']);
+  }
+  else {
+    $config_names = config_get_names_with_prefix($prefix);
   }
 
   $fields = array();
-  $config_names = config_get_names_with_prefix($prefix);
   foreach ($config_names as $config_name) {
     $config = config($config_name);
     $field = $config->get();
+
+    // Continue if matching against a specific field that doesn't exist.
+    if (isset($params['field_name']) && empty($field)) {
+      continue;
+    }
+    else {
+      unset($params['field_name']);
+    }
 
     // Continue if the config does not match passed parameters.
     if ($params) {
@@ -701,6 +710,7 @@ function field_read_instances($params = array(), $include_additional = array()) 
   $include_deleted = isset($include_additional['include_deleted']) && $include_additional['include_deleted'];
 
   $prefix = 'field.instance.';
+  $get_full_name = FALSE;
   if (isset($params['entity_type'])) {
     $prefix .= $params['entity_type'] . '.';
     unset($params['entity_type']);
@@ -710,18 +720,30 @@ function field_read_instances($params = array(), $include_additional = array()) 
       if (isset($params['field_name'])) {
         $prefix .= $params['field_name'];
         unset($params['field_name']);
+        $get_full_name = TRUE;
       }
     }
+  }
+
+  if ($get_full_name) {
+    $config_names = array($prefix);
+  }
+  else {
+    $config_names = config_get_names_with_prefix($prefix);
   }
 
   // Fields used for reference.
   $fields = _field_read_fields_cache();
 
   $instances = array();
-  $config_names = config_get_names_with_prefix($prefix);
   foreach ($config_names as $config_name) {
     $config = config($config_name);
     $instance = $config->get();
+
+    // Continue if matching against a specific field that doesn't exist.
+    if ($get_full_name && empty($instance)) {
+      continue;
+    }
 
     if ($params) {
       foreach ($params as $param_key => $param_value) {

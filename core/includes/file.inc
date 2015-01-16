@@ -38,27 +38,27 @@ require_once BACKDROP_ROOT . '/core/includes/stream_wrappers.inc';
 /**
  * Flag used by file_prepare_directory() -- create directory if not present.
  */
-const FILE_CREATE_DIRECTORY = 1;
+define('FILE_CREATE_DIRECTORY', 1);
 
 /**
  * Flag used by file_prepare_directory() -- file permissions may be changed.
  */
-const FILE_MODIFY_PERMISSIONS = 2;
+define('FILE_MODIFY_PERMISSIONS', 2);
 
 /**
  * Flag for dealing with existing files: Appends number until name is unique.
  */
-const FILE_EXISTS_RENAME = 0;
+define('FILE_EXISTS_RENAME', 0);
 
 /**
  * Flag for dealing with existing files: Replace the existing file.
  */
-const FILE_EXISTS_REPLACE = 1;
+define('FILE_EXISTS_REPLACE', 1);
 
 /**
  * Flag for dealing with existing files: Do nothing and return FALSE.
  */
-const FILE_EXISTS_ERROR = 2;
+define('FILE_EXISTS_ERROR', 2);
 
 /**
  * Indicates that the file is permanent and should not be deleted.
@@ -67,7 +67,7 @@ const FILE_EXISTS_ERROR = 2;
  * during cron runs, but permanent files will not be removed during the file
  * garbage collection process.
  */
-const FILE_STATUS_PERMANENT = 1;
+define('FILE_STATUS_PERMANENT', 1);
 
 /**
  * Provides Backdrop stream wrapper registry.
@@ -254,7 +254,14 @@ function file_uri_target($uri) {
  *   'public', 'private' or any other file scheme defined as the default.
  */
 function file_default_scheme() {
-  return config_get('system.core', 'file_default_scheme');
+  try {
+    $scheme = config_get('system.core', 'file_default_scheme');
+  }
+  catch (ConfigException $e) {}
+  if (empty($scheme)) {
+    $scheme = 'public';
+  }
+  return $scheme;
 }
 
 /**
@@ -559,8 +566,6 @@ EOF;
  *
  * @return
  *   An array of file entities, indexed by fid.
- *
- * @todo Remove $conditions in Drupal 8.
  *
  * @see hook_file_load()
  * @see file_load()
@@ -1136,7 +1141,7 @@ function file_munge_filename($filename, $extensions, $alerts = TRUE) {
     // Remove any null bytes. See http://php.net/manual/security.filesystem.nullbytes.php
     $filename = str_replace(chr(0), '', $filename);
 
-    $whitelist = array_unique(explode(' ', trim($extensions)));
+    $whitelist = array_unique(explode(' ', strtolower(trim($extensions))));
 
     // Split the filename up by periods. The first part becomes the basename
     // the last part the final extension.
@@ -1149,7 +1154,7 @@ function file_munge_filename($filename, $extensions, $alerts = TRUE) {
     // of allowed extensions.
     foreach ($filename_parts as $filename_part) {
       $new_filename .= '.' . $filename_part;
-      if (!in_array($filename_part, $whitelist) && preg_match("/^[a-zA-Z]{2,5}\d?$/", $filename_part)) {
+      if (!in_array(strtolower($filename_part), $whitelist) && preg_match("/^[a-zA-Z]{2,5}\d?$/", $filename_part)) {
         $new_filename .= '_';
       }
     }
@@ -1383,7 +1388,7 @@ function file_space_used($uid = NULL, $status = FILE_STATUS_PERMANENT) {
  *   at all).
  * @param $destination
  *   A string containing the URI that the file should be copied to. This must
- *   be a stream wrapper URI. If this value is omitted, Drupal's temporary
+ *   be a stream wrapper URI. If this value is omitted, Backdrop's temporary
  *   files scheme will be used ("temporary://").
  * @param $replace
  *   Replace behavior when the destination file already exists:
@@ -2485,8 +2490,6 @@ function file_directory_temp() {
       // everything to use slash which is supported on all platforms.
       $temporary_directory = str_replace('\\', '/', $temporary_directory);
     }
-    // Save the path of the discovered directory.
-    config_set('system.core', 'file_temporary_path', $temporary_directory);
   }
 
   return $temporary_directory;

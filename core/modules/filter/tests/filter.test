@@ -66,6 +66,15 @@ class FilterCRUDTestCase extends BackdropWebTestCase {
     $this->assertFalse($config_format['status'], 'Disabled text format is marked as disabled in config.');
     $formats = filter_formats();
     $this->assertTrue(!isset($formats[$format->format]), 'filter_formats: Disabled text format no longer exists.');
+
+    // Add a new format to check for Xss in format name.
+    $format = new stdClass();
+    $format->format = 'xss_format';
+    $format->name = '<script>alert(123)</script>';
+    filter_format_save($format);
+    user_role_change_permissions(BACKDROP_ANONYMOUS_ROLE, array(filter_permission_name($format) => 1));
+    $this->backdropGet('filter/tips');
+    $this->assertNoRaw($format->name, 'Text format name contains no xss.');
   }
 
   /**
@@ -566,13 +575,9 @@ class FilterFormatAccessTestCase extends BackdropWebTestCase {
     // Verify that body field is read-only and contains replacement value.
     $this->assertFieldByXPath("//textarea[@name='$body_value_key' and @disabled='disabled']", t('This field has been disabled because you do not have sufficient permissions to edit it.'), 'Text format access denied message found.');
 
-    // Verify that title can be changed, but preview displays original body.
+    // Change the title and verify that only the title was changed.
     $new_edit = array();
     $new_edit['title'] = $this->randomName(8);
-    $this->backdropPost(NULL, $new_edit, t('Preview'));
-    $this->assertText($edit[$body_value_key], 'Old body found in preview.');
-
-    // Save and verify that only the title was changed.
     $this->backdropPost(NULL, $new_edit, t('Save'));
     $this->assertNoText($edit['title'], 'Old title not found.');
     $this->assertText($new_edit['title'], 'New title found.');

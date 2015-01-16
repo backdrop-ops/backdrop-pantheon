@@ -159,6 +159,20 @@ class User extends Entity {
     }
     return $uri;
   }
+
+  /**
+   * Implements EntityInterface::save().
+   */
+  public function save() {
+    // Since pictures are not yet fields Save the picture object, if it is set.
+    $picture = empty($this->picture) ? NULL : $this->picture;
+    // Save the user.
+    $return = parent::save();
+    // Restore the picture object.
+    $this->picture = $picture;
+
+    return $return;
+  }
 }
 
 
@@ -357,16 +371,16 @@ class UserStorageController extends EntityDatabaseStorageController {
       }
     }
     else {
-      // Save user roles.
-      if (count($entity->roles) > 1) {
+      // Save user roles. Skip built-in roles, and ones that were already saved
+      // to the database during hook calls.
+      $role_names_to_skip = array_merge(array(BACKDROP_ANONYMOUS_ROLE, BACKDROP_AUTHENTICATED_ROLE), db_query('SELECT role FROM {users_roles} WHERE uid = :uid', array(':uid' => $entity->uid))->fetchCol());
+      if ($roles_to_save = array_diff($entity->roles, $role_names_to_skip)) {
         $query = db_insert('users_roles')->fields(array('uid', 'role'));
-        foreach ($entity->roles as $role_name) {
-          if (!in_array($role_name, array(BACKDROP_ANONYMOUS_ROLE, BACKDROP_AUTHENTICATED_ROLE))) {
-            $query->values(array(
-              'uid' => $entity->uid,
-              'role' => $role_name,
-            ));
-          }
+        foreach ($roles_to_save as $role_name) {
+          $query->values(array(
+            'uid' => $entity->uid,
+            'role' => $role_name,
+          ));
         }
         $query->execute();
       }

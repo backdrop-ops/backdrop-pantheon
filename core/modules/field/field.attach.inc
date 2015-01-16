@@ -32,14 +32,14 @@
  * This is used in hook_field_storage_write when updating an
  * existing entity.
  */
-const FIELD_STORAGE_UPDATE = 'update';
+define('FIELD_STORAGE_UPDATE', 'update');
 
 /**
  * Argument for an insert operation.
  *
  * This is used in hook_field_storage_write when inserting a new entity.
  */
-const FIELD_STORAGE_INSERT = 'insert';
+define('FIELD_STORAGE_INSERT', 'insert');
 
 /**
  * @} End of "defgroup field_storage".
@@ -284,7 +284,7 @@ function _field_invoke_multiple($op, $entity_type, $entities, &$a = NULL, &$b = 
         // Unless a language suggestion is provided we iterate on all the
         // available languages.
         $available_languages = field_available_languages($entity_type, $field);
-        $language = !empty($options['language'][$id]) ? $options['language'][$id] : $options['language'];
+        $language = is_array($options['language']) && !empty($options['language'][$id]) ? $options['language'][$id] : $options['language'];
         $languages = _field_language_suggestion($available_languages, $language, $field_name);
         foreach ($languages as $langcode) {
           $grouped_items[$field_name][$langcode][$id] = isset($entity->{$field_name}[$langcode]) ? $entity->{$field_name}[$langcode] : array();

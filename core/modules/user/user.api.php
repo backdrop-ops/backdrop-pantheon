@@ -195,40 +195,6 @@ function hook_user_format_name_alter(&$name, $account) {
 }
 
 /**
- * Add mass user operations.
- *
- * This hook enables modules to inject custom operations into the mass operations
- * dropdown found at admin/people, by associating a callback function with
- * the operation, which is called when the form is submitted. The callback function
- * receives one initial argument, which is an array of the checked users.
- *
- * @return
- *   An array of operations. Each operation is an associative array that may
- *   contain the following key-value pairs:
- *   - "label": Required. The label for the operation, displayed in the dropdown menu.
- *   - "callback": Required. The function to call for the operation.
- *   - "callback arguments": Optional. An array of additional arguments to pass to
- *     the callback function.
- *
- */
-function hook_user_operations() {
-  $operations = array(
-    'unblock' => array(
-      'label' => t('Unblock the selected users'),
-      'callback' => 'user_user_operations_unblock',
-    ),
-    'block' => array(
-      'label' => t('Block the selected users'),
-      'callback' => 'user_user_operations_block',
-    ),
-    'cancel' => array(
-      'label' => t('Cancel the selected user accounts'),
-    ),
-  );
-  return $operations;
-}
-
-/**
  * Act on a user account being inserted or updated.
  *
  * This hook is invoked before the user account is saved to the database.
@@ -393,7 +359,7 @@ function hook_user_view_alter(&$build) {
 }
 
 /**
- * Inform other modules that a user role is about to be saved.
+ * Act on a user role being inserted or updated.
  *
  * Modules implementing this hook can act on the user role object before
  * it has been saved to the database.
@@ -412,7 +378,7 @@ function hook_user_role_presave($role) {
 }
 
 /**
- * Inform other modules that a user role has been added.
+ * Respond to creation of a new user role.
  *
  * Modules implementing this hook can act on the user role object when saved to
  * the database. It's recommended that you implement this hook if your module
@@ -433,7 +399,7 @@ function hook_user_role_insert($role) {
 }
 
 /**
- * Inform other modules that a user role has been updated.
+ * Respond to updates to a user role.
  *
  * Modules implementing this hook can act on the user role object when updated.
  * It's recommended that you implement this hook if your module adds additional
@@ -454,7 +420,7 @@ function hook_user_role_update($role) {
 }
 
 /**
- * Inform other modules that a user role has been deleted.
+ * Respond to user role deletion.
  *
  * This hook allows you act when a user role has been deleted.
  * If your module stores references to roles, it's recommended that you

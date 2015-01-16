@@ -49,34 +49,6 @@ function node_add_page() {
 }
 
 /**
- * Returns HTML for a list of available node types for node creation.
- *
- * @param $variables
- *   An associative array containing:
- *   - content: An array of content types.
- *
- * @see node_add_page()
- * @ingroup themeable
- */
-function theme_node_add_list($variables) {
-  $content = $variables['content'];
-  $output = '';
-
-  if ($content) {
-    $output = '<dl class="node-type-list">';
-    foreach ($content as $item) {
-      $output .= '<dt>' . l($item['title'], $item['href'], $item['localized_options']) . '</dt>';
-      $output .= '<dd>' . filter_xss_admin($item['description']) . '</dd>';
-    }
-    $output .= '</dl>';
-  }
-  else {
-    $output = '<p>' . t('You have not created any content types yet. Go to the <a href="@create-content">content type creation page</a> to add a new content type.', array('@create-content' => url('admin/structure/types/add'))) . '</p>';
-  }
-  return $output;
-}
-
-/**
  * Page callback: Provides the node submission form.
  *
  * @param $type
@@ -107,7 +79,6 @@ function node_add($type) {
  * Form validation handler for node_form().
  *
  * @see node_form_delete_submit()
- * @see node_form_build_preview()
  * @see node_form_submit()
  * @see node_form_submit_build_node()
  */
@@ -127,7 +98,6 @@ function node_form_validate($form, &$form_state) {
  * Form constructor for the node add/edit form.
  *
  * @see node_form_delete_submit()
- * @see node_form_build_preview()
  * @see node_form_validate()
  * @see node_form_submit()
  * @see node_form_submit_build_node()
@@ -148,15 +118,6 @@ function node_form($form, &$form_state, Node $node) {
     $node = $form_state['node'];
   }
   $node_type = node_type_get_type($node->type);
-
-  // Some special stuff when previewing a node.
-  if (isset($form_state['node_preview'])) {
-    $form['#prefix'] = $form_state['node_preview'];
-    $node->in_preview = TRUE;
-  }
-  else {
-    unset($node->in_preview);
-  }
 
   // Override the default CSS class name, since the user-defined node type name
   // in 'TYPE-node-form' potentially clashes with third-party class names.
@@ -189,7 +150,6 @@ function node_form($form, &$form_state, Node $node) {
   if (isset($form['title']) && !isset($form['title']['#weight'])) {
     $form['title']['#weight'] = -5;
   }
-  // @todo D8: Remove. Modules should access the node using $form_state['node'].
   $form['#node'] = $node;
 
   if ($node_type->settings['node_type_language'] && module_exists('language')) {
@@ -233,7 +193,7 @@ function node_form($form, &$form_state, Node $node) {
       'class' => array('node-form-revision-information'),
     ),
     '#attached' => array(
-      'js' => array(backdrop_get_path('module', 'node') . '/node.js'),
+      'js' => array(backdrop_get_path('module', 'node') . '/js/node.js'),
     ),
     '#weight' => 20,
     '#access' => $node->nid && $node_type->settings['revision_enabled'] && ($node->revision || user_access('administer nodes')),
@@ -275,7 +235,7 @@ function node_form($form, &$form_state, Node $node) {
     ),
     '#attached' => array(
       'js' => array(
-        backdrop_get_path('module', 'node') . '/node.js',
+        backdrop_get_path('module', 'node') . '/js/node.js',
         array(
           'type' => 'setting',
           'data' => array('anonymous' => $config->get('anonymous')),
@@ -322,7 +282,7 @@ function node_form($form, &$form_state, Node $node) {
       'class' => array('node-form-options'),
     ),
     '#attached' => array(
-      'js' => array(backdrop_get_path('module', 'node') . '/node.js'),
+      'js' => array(backdrop_get_path('module', 'node') . '/js/node.js'),
     ),
     '#weight' => -10,
   );
@@ -364,17 +324,10 @@ function node_form($form, &$form_state, Node $node) {
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#type' => 'submit',
-    '#access' => $node_type->settings['node_preview'] != BACKDROP_REQUIRED || (!form_get_errors() && isset($form_state['node_preview'])),
+    '#access' => (!form_get_errors()),
     '#value' => t('Save'),
     '#weight' => 5,
     '#submit' => array('node_form_submit'),
-  );
-  $form['actions']['preview'] = array(
-    '#access' => $node_type->settings['node_preview'] != BACKDROP_DISABLED,
-    '#type' => 'submit',
-    '#value' => t('Preview'),
-    '#weight' => 10,
-    '#submit' => array('node_form_build_preview'),
   );
   if (!empty($node->nid) && node_access('delete', $node)) {
     $form['actions']['delete'] = array(
@@ -410,7 +363,6 @@ function node_form($form, &$form_state, Node $node) {
 /**
  * Form submission handler for the 'Delete' button for node_form().
  *
- * @see node_form_build_preview()
  * @see node_form_validate()
  * @see node_form_submit()
  * @see node_form_submit_build_node()
@@ -426,112 +378,8 @@ function node_form_delete_submit($form, &$form_state) {
 }
 
 /**
- * Form submission handler for the 'Preview' button for node_form().
- *
- * @see node_form_delete_submit()
- * @see node_form_validate()
- * @see node_form_submit()
- * @see node_form_submit_build_node()
- */
-function node_form_build_preview($form, &$form_state) {
-  $node = node_form_submit_build_node($form, $form_state);
-  $form_state['node_preview'] = node_preview($node);
-  $form_state['rebuild'] = TRUE;
-}
-
-/**
- * Generates a node preview.
- *
- * @param Node $node
- *   The node to preview.
- *
- * @return
- *   An HTML-formatted string of a node preview.
- *
- * @see node_form_build_preview()
- */
-function node_preview(Node $node) {
-  // Clone the node before previewing it to prevent the node itself from being
-  // modified.
-  $cloned_node = clone $node;
-  if (node_access('create', $cloned_node) || node_access('update', $cloned_node)) {
-    _field_invoke_multiple('load', 'node', array($cloned_node->nid => $cloned_node));
-    // Load the user's name when needed.
-    if (isset($cloned_node->name)) {
-      // The use of isset() is mandatory in the context of user IDs, because
-      // user ID 0 denotes the anonymous user.
-      if ($user = user_load_by_name($cloned_node->name)) {
-        $cloned_node->uid = $user->uid;
-        $cloned_node->picture = $user->picture;
-      }
-      else {
-        $cloned_node->uid = 0; // anonymous user
-      }
-    }
-    elseif ($cloned_node->uid) {
-      $user = user_load($cloned_node->uid);
-      $cloned_node->name = $user->name;
-      $cloned_node->picture = $user->picture;
-    }
-
-    $cloned_node->changed = REQUEST_TIME;
-    $nodes = array($cloned_node->nid => $cloned_node);
-    field_attach_prepare_view('node', $nodes, 'full');
-
-    // Display a preview of the node.
-    if (!form_get_errors()) {
-      $cloned_node->in_preview = TRUE;
-      $output = theme('node_preview', array('node' => $cloned_node));
-      unset($cloned_node->in_preview);
-    }
-    backdrop_set_title(t('Preview'), PASS_THROUGH);
-
-    return $output;
-  }
-}
-
-/**
- * Returns HTML for a node preview for display during node creation and editing.
- *
- * @param $variables
- *   An associative array containing:
- *   - node: The node entity which is being previewed.
- *
- * @see node_preview()
- *
- * @ingroup themeable
- */
-function theme_node_preview($variables) {
-  $node = $variables['node'];
-
-  $output = '';
-
-  $preview_trimmed_version = FALSE;
-
-  $elements = node_view(clone $node, 'teaser');
-  $trimmed = backdrop_render($elements);
-  $elements = node_view($node, 'full');
-  $full = backdrop_render($elements);
-
-  // Do we need to preview trimmed version of post as well as full version?
-  if ($trimmed != $full) {
-    backdrop_set_message(t('The trimmed version of your post shows what your post looks like when promoted to the main page or when exported for syndication.<span class="no-js"> You can insert the delimiter "&lt;!--break--&gt;" (without the quotes) to fine-tune where your post gets split.</span>'));
-    $output .= '<h3>' . t('Preview trimmed version') . '</h3>';
-    $output .= $trimmed;
-    $output .= '<h3>' . t('Preview full version') . '</h3>';
-    $output .= $full;
-  }
-  else {
-    $output .= $full;
-  }
-
-  return $output;
-}
-
-/**
  * Form submission handler that saves the node for node_form().
  *
- * @see node_form_build_preview()
  * @see node_form_delete_submit()
  * @see node_form_validate()
  * @see node_form_submit_build_node()
@@ -559,7 +407,7 @@ function node_form_submit($form, &$form_state) {
   }
   else {
     // In the unlikely case something went wrong on save, the node will be
-    // rebuilt and node form redisplayed the same way as in preview.
+    // rebuilt and node form redisplayed.
     backdrop_set_message(t('The post could not be saved.'), 'error');
     $form_state['rebuild'] = TRUE;
   }
@@ -568,15 +416,13 @@ function node_form_submit($form, &$form_state) {
 /**
  * Updates the form state's node entity by processing this submission's values.
  *
- * This is the default builder function for the node form. It is called
- * during the "Save" and "Preview" submit handlers to retrieve the entity to
- * save or preview. This function can also be called by a "Next" button of a
- * wizard to update the form state's entity with the current step's values
- * before proceeding to the next step.
+ * This is the default builder function for the node form. It is called during
+ * the "Save" submit handler to retrieve the entity to save. This function can
+ * also be called by a "Next" button of a wizard to update the form state's
+ * entity with the current step's values before proceeding to the next step.
  *
  * @see node_form()
  * @see node_form_delete_submit()
- * @see node_form_build_preview()
  * @see node_form_validate()
  * @see node_form_submit()
  */

@@ -25,37 +25,37 @@
 /**
  * Layouts constant for user-defined layouts.
  */
-const LAYOUT_STORAGE_NORMAL = 1;
+define('LAYOUT_STORAGE_NORMAL', 1);
 
 /**
  * Layout constant for layouts that override module-defined presets.
  */
-const LAYOUT_STORAGE_OVERRIDE = 2;
+define('LAYOUT_STORAGE_OVERRIDE', 2);
 
 /**
  * Layout constant for module-defined layouts.
  */
-const LAYOUT_STORAGE_DEFAULT = 4;
+define('LAYOUT_STORAGE_DEFAULT', 4);
 
 /**
  * Layout constant indicating the title of the layout is the default.
  */
-const LAYOUT_TITLE_DEFAULT = 'default';
+define('LAYOUT_TITLE_DEFAULT', 'default');
 
 /**
  * Layout constant indicating the title of the layout is not shown.
  */
-const LAYOUT_TITLE_NONE = 'none';
+define('LAYOUT_TITLE_NONE', 'none');
 
 /**
  * Layout constant indicating the title of the layout is manually specified.
  */
-const LAYOUT_TITLE_CUSTOM = 'custom';
+define('LAYOUT_TITLE_CUSTOM', 'custom');
 
 /**
  * Layout constant indicating the title of the layout comes from a block.
  */
-const LAYOUT_TITLE_BLOCK = 'block';
+define('LAYOUT_TITLE_BLOCK', 'block');
 
 /**
  * Implements hook_menu().
@@ -64,7 +64,7 @@ function layout_menu() {
   $items = array();
   $base = array(
     'access arguments' => array('administer layouts'),
-    'file' => 'includes/layout.admin.inc',
+    'file' => 'layout.admin.inc',
     'theme callback' => 'ajax_base_page_theme',
   );
 
@@ -320,7 +320,7 @@ function layout_page_menu_item(array $menu, array $access_arguments, array $page
     'page callback' => 'layout_page_callback',
     'page arguments' => $page_arguments,
     'load arguments' => $load_arguments,
-    'file' => 'includes/layout.pages.inc',
+    'file' => 'layout.pages.inc',
   );
 
   if (isset($menu['title'])) {
@@ -375,7 +375,7 @@ function layout_page_title(Layout $layout) {
  * Menu access callback; Check access for any Layout-provided page.
  */
 function layout_page_access() {
-  module_load_include('inc', 'layout', 'includes/layout.pages');
+  module_load_include('inc', 'layout', 'layout.pages');
   $args = func_get_args();
   return call_user_func_array('_layout_page_access', $args);
 }
@@ -453,12 +453,8 @@ function layout_route_handler($router_item) {
  * Implements hook_theme()
  */
 function layout_theme() {
-  // Include the theme file so that the base process/preprocess functions are
-  // in the global namespace.
-  module_load_include('inc', 'layout', 'includes/layout.theme');
-
   $base = array(
-    'file' => 'includes/layout.theme.inc',
+    'file' => 'layout.theme.inc',
   );
 
   $items = array(
@@ -954,6 +950,10 @@ function layout_get_path_layout_names($path) {
  *   specified the path, or NULL if a path does not exist in the system.
  */
 function layout_provides_path($path) {
+  if (empty($path)) {
+    return FALSE;
+  }
+
   $result = db_query('SELECT * FROM {menu_router} WHERE path = :path', array(':path' => $path));
   $return = NULL;
 
