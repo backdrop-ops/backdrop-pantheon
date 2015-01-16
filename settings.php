@@ -486,3 +486,13 @@ $settings['404_fast_html'] = '<!DOCTYPE html><html><head><title>404 Not Found</t
  * built for Backdrop.
  */
 $settings['backdrop_drupal_compatibility'] = TRUE;
+
+/**
+ * Pantheon specific compatibility.
+ *
+ * Override the database information to pass the correct Database credentials
+ * directly from Pantheon to Backdrop.
+ */
+if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
+  $_SERVER['BACKDROP_SETTINGS'] = $_SERVER['PRESSFLOW_SETTINGS'];
+}
