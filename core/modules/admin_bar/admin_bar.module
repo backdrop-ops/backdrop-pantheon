@@ -17,7 +17,7 @@ function admin_bar_menu() {
     'type' => MENU_CALLBACK,
   );
   // Module settings.
-  $items['admin/config/administration/admin_bar'] = array(
+  $items['admin/config/administration/admin-bar'] = array(
     'title' => 'Administration bar',
     'description' => 'Adjust administration bar settings.',
     'page callback' => 'backdrop_get_form',
@@ -55,15 +55,17 @@ function admin_bar_permission() {
  * Implements hook_theme().
  */
 function admin_bar_theme() {
+  $base = array(
+    'file' => 'admin_bar.theme.inc',
+  );
+
   return array(
     'admin_bar_links' => array(
       'render element' => 'elements',
-      'file' => 'admin_bar.inc',
-    ),
+    ) + $base,
     'admin_bar_icon' => array(
       'variables' => array('src' => NULL, 'alt' => NULL),
-      'file' => 'admin_bar.inc',
-    ),
+    ) + $base,
   );
 }
 
@@ -143,7 +145,7 @@ function admin_bar_preprocess_page(&$variables) {
   $options = array('every_page' => TRUE);
 
   backdrop_add_css($path . '/css/admin_bar.css', $options);
-  backdrop_add_js($path . '/admin_bar.js', $options);
+  backdrop_add_js($path . '/js/admin_bar.js', $options);
 
   // Add current path to support menu item highlighting.
   $args = explode('/', $_GET['q']);
@@ -527,7 +529,7 @@ function admin_bar_form_alter(&$form, &$form_state, $form_id) {
   // auto-enable the 'access administration bar' permission along with
   // 'access administration pages'.
   if ($form_id == 'user_admin_permissions') {
-    $form['#attached']['js'][] = backdrop_get_path('module', 'admin_bar') . '/admin_bar.admin.js';
+    $form['#attached']['js'][] = backdrop_get_path('module', 'admin_bar') . '/js/admin_bar.admin.js';
   }
 }
 

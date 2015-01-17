@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Provides testing functionality.
@@ -57,15 +56,17 @@ function simpletest_permission() {
  * Implements hook_theme().
  */
 function simpletest_theme() {
+  $base = array(
+    'file' => 'simpletest.theme.inc',
+  );
+
   return array(
     'simpletest_test_table' => array(
       'render element' => 'table',
-      'file' => 'simpletest.pages.inc',
-    ),
+    ) + $base,
     'simpletest_result_summary' => array(
       'render element' => 'form',
-      'file' => 'simpletest.pages.inc',
-    ),
+    ) + $base,
   );
 }
 
@@ -97,7 +98,7 @@ function simpletest_autoload_info() {
 function simpletest_js_alter(&$javascript) {
   // Since SimpleTest is a special use case for the table select, stick the
   // SimpleTest JavaScript above the table select.
-  $simpletest = backdrop_get_path('module', 'simpletest') . '/simpletest.js';
+  $simpletest = backdrop_get_path('module', 'simpletest') . '/js/simpletest.js';
   if (array_key_exists($simpletest, $javascript) && array_key_exists('core/misc/tableselect.js', $javascript)) {
     $javascript[$simpletest]['weight'] = $javascript['core/misc/tableselect.js']['weight'] - 1;
   }

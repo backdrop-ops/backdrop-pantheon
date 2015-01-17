@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Enables the organization of content into categories.
@@ -40,12 +39,12 @@ function taxonomy_permission() {
   foreach (taxonomy_vocabulary_load_multiple(FALSE) as $vocabulary) {
     $permissions += array(
       'edit terms in ' . $vocabulary->machine_name => array(
-        'title' => t('Edit terms in %vocabulary', array('%vocabulary' => $vocabulary->name)),
+        'title' => t('%vocabulary: Edit terms', array('%vocabulary' => $vocabulary->name)),
       ),
     );
     $permissions += array(
        'delete terms in ' . $vocabulary->machine_name => array(
-         'title' => t('Delete terms from %vocabulary', array('%vocabulary' => $vocabulary->name)),
+         'title' => t('%vocabulary: Delete terms', array('%vocabulary' => $vocabulary->name)),
       ),
     );
   }
@@ -197,17 +196,21 @@ function taxonomy_select_nodes($tid, $pager = TRUE, $limit = FALSE, $order = arr
  * Implements hook_theme().
  */
 function taxonomy_theme() {
+  $base = array(
+    'file' => 'taxonomy.theme.inc',
+  );
+
   return array(
     'taxonomy_overview_vocabularies' => array(
       'render element' => 'form',
-    ),
+    ) + $base,
     'taxonomy_overview_terms' => array(
       'render element' => 'form',
-    ),
+    ) + $base,
     'taxonomy_term' => array(
       'render element' => 'elements',
       'template' => 'templates/taxonomy-term',
-    ),
+    ) + $base,
   );
 }
 
@@ -221,7 +224,7 @@ function taxonomy_menu() {
     'page callback' => 'backdrop_get_form',
     'page arguments' => array('taxonomy_overview_vocabularies'),
     'access arguments' => array('administer taxonomy'),
-    'file' => 'includes/taxonomy.admin.inc',
+    'file' => 'taxonomy.admin.inc',
   );
   $items['admin/structure/taxonomy/list'] = array(
     'title' => 'List',
@@ -234,7 +237,7 @@ function taxonomy_menu() {
     'page arguments' => array('taxonomy_form_vocabulary'),
     'access arguments' => array('administer taxonomy'),
     'type' => MENU_LOCAL_ACTION,
-    'file' => 'includes/taxonomy.admin.inc',
+    'file' => 'taxonomy.admin.inc',
   );
 
   $items['taxonomy/term/%taxonomy_term'] = array(
@@ -244,7 +247,7 @@ function taxonomy_menu() {
     'page callback' => 'taxonomy_term_page',
     'page arguments' => array(2),
     'access arguments' => array('access content'),
-    'file' => 'includes/taxonomy.pages.inc',
+    'file' => 'taxonomy.pages.inc',
   );
   $items['taxonomy/term/%taxonomy_term/view'] = array(
     'title' => 'View',
@@ -260,7 +263,7 @@ function taxonomy_menu() {
     'access arguments' => array('edit', 2),
     'type' => MENU_LOCAL_TASK,
     'weight' => 10,
-    'file' => 'includes/taxonomy.admin.inc',
+    'file' => 'taxonomy.admin.inc',
   );
   $items['taxonomy/term/%taxonomy_term/delete'] = array(
     'title' => 'Delete',
@@ -270,7 +273,7 @@ function taxonomy_menu() {
     'access arguments' => array('delete', 2),
     'type' => MENU_LOCAL_TASK,
     'weight' => 11,
-    'file' => 'includes/taxonomy.admin.inc',
+    'file' => 'taxonomy.admin.inc',
   );
   $items['taxonomy/term/%taxonomy_term/feed'] = array(
     'title' => 'Taxonomy term',
@@ -280,14 +283,14 @@ function taxonomy_menu() {
     'page arguments' => array(2),
     'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
-    'file' => 'includes/taxonomy.pages.inc',
+    'file' => 'taxonomy.pages.inc',
   );
   $items['taxonomy/autocomplete'] = array(
     'title' => 'Autocomplete taxonomy',
     'page callback' => 'taxonomy_autocomplete',
     'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
-    'file' => 'includes/taxonomy.pages.inc',
+    'file' => 'taxonomy.pages.inc',
   );
 
   $items['admin/structure/taxonomy/%taxonomy_vocabulary'] = array(
@@ -296,7 +299,7 @@ function taxonomy_menu() {
     'page callback' => 'backdrop_get_form',
     'page arguments' => array('taxonomy_overview_terms', 3),
     'access arguments' => array('administer taxonomy'),
-    'file' => 'includes/taxonomy.admin.inc',
+    'file' => 'taxonomy.admin.inc',
   );
   $items['admin/structure/taxonomy/%taxonomy_vocabulary/list'] = array(
     'title' => 'List',
@@ -310,7 +313,7 @@ function taxonomy_menu() {
     'access arguments' => array('administer taxonomy'),
     'type' => MENU_LOCAL_TASK,
     'weight' => -10,
-    'file' => 'includes/taxonomy.admin.inc',
+    'file' => 'taxonomy.admin.inc',
   );
 
   $items['admin/structure/taxonomy/%taxonomy_vocabulary/add'] = array(
@@ -319,7 +322,7 @@ function taxonomy_menu() {
     'page arguments' => array('taxonomy_form_term', NULL, 3),
     'access arguments' => array('administer taxonomy'),
     'type' => MENU_LOCAL_ACTION,
-    'file' => 'includes/taxonomy.admin.inc',
+    'file' => 'taxonomy.admin.inc',
   );
 
   $items['admin/structure/taxonomy/%taxonomy_vocabulary/delete'] = array(
@@ -328,7 +331,7 @@ function taxonomy_menu() {
     'page arguments' => array('taxonomy_vocabulary_confirm_delete', 3),
     'access arguments' => array('administer taxonomy'),
     'type' => MENU_CALLBACK,
-    'file' => 'includes/taxonomy.admin.inc',
+    'file' => 'taxonomy.admin.inc',
   );
 
   return $items;
@@ -679,42 +682,6 @@ function taxonomy_term_view(TaxonomyTerm $term, $view_mode = 'full', $langcode =
 }
 
 /**
- * Process variables for taxonomy-term.tpl.php.
- */
-function template_preprocess_taxonomy_term(&$variables) {
-  $variables['view_mode'] = $variables['elements']['#view_mode'];
-  $variables['term'] = $variables['elements']['#term'];
-  $term = $variables['term'];
-
-  $uri = entity_uri('taxonomy_term', $term);
-  $variables['term_url']  = url($uri['path'], $uri['options']);
-  $variables['term_name'] = check_plain($term->name);
-  $variables['page']      = $variables['view_mode'] == 'full' && taxonomy_term_is_page($term);
-
-  // Flatten the term object's member fields.
-  $variables = array_merge((array) $term, $variables);
-
-  // Helpful $content variable for templates.
-  $variables['content'] = array();
-  foreach (element_children($variables['elements']) as $key) {
-    $variables['content'][$key] = $variables['elements'][$key];
-  }
-
-  // field_attach_preprocess() overwrites the $[field_name] variables with the
-  // values of the field in the language that was selected for display, instead
-  // of the raw values in $term->[field_name], which contain all values in all
-  // languages.
-  field_attach_preprocess('taxonomy_term', $term, $variables['content'], $variables);
-
-  // Gather classes, and clean up name so there are no underscores.
-  $vocabulary_name_css = backdrop_clean_css_identifier($term->vocabulary);
-  $variables['classes'][] = 'vocabulary-' . $vocabulary_name_css;
-
-  $variables['theme_hook_suggestions'][] = 'taxonomy_term__' . $term->vocabulary;
-  $variables['theme_hook_suggestions'][] = 'taxonomy_term__' . $term->tid;
-}
-
-/**
  * Returns whether the current page is the page of the passed-in term.
  *
  * @param TaxonomyTerm $term
@@ -994,9 +961,9 @@ function taxonomy_term_load_multiple_by_name($name, $vocabulary_name = NULL) {
  */
 function taxonomy_autoload_info() {
   return array(
-    'TaxonomyTerm' => 'includes/taxonomy.entity.inc',
-    'TaxonomyTermController' => 'includes/taxonomy.entity.inc',
-    'TaxonomyVocabulary' => 'includes/taxonomy_vocabulary.class.inc',
+    'TaxonomyTerm' => 'taxonomy.entity.inc',
+    'TaxonomyTermController' => 'taxonomy.entity.inc',
+    'TaxonomyVocabulary' => 'taxonomy_vocabulary.class.inc',
     // Views handlers.
     'views_handler_argument_taxonomy' => 'views/views_handler_argument_taxonomy.inc',
     'views_handler_argument_term_node_tid' => 'views/views_handler_argument_term_node_tid.inc',

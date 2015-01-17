@@ -255,13 +255,17 @@ function locale_field_node_form_submit($form, &$form_state) {
  * Implements hook_theme().
  */
 function locale_theme() {
+  $base = array(
+    'file' => 'locale.theme.inc',
+  );
+
   return array(
     'language_negotiation_configure_form' => array(
       'render element' => 'form',
-    ),
+    ) + $base,
     'locale_date_format_form' => array(
       'render element' => 'form',
-    ),
+    ) + $base,
   );
 }
 
@@ -802,7 +806,7 @@ function locale_library_info_alter(&$libraries, $module) {
     // locale.datepicker.js should be added in the JS_LIBRARY group, so that
     // this attach behavior will execute early. JS_LIBRARY is the default for
     // hook_library_info_alter(), thus does not have to be specified explicitly.
-    $datepicker = backdrop_get_path('module', 'locale') . '/locale.datepicker.js';
+    $datepicker = backdrop_get_path('module', 'locale') . '/js/locale.datepicker.js';
     $libraries['ui.datepicker']['js'][$datepicker] = array();
     $libraries['ui.datepicker']['js'][] = array(
       'data' => array(
