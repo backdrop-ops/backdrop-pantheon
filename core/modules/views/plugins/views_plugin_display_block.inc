@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Contains the block display plugin.
@@ -29,7 +28,7 @@ class views_plugin_display_block extends views_plugin_display {
     $delta = $this->view->name . '-' . $this->display->id;
     $info = $this->get_option('block_description');
 
-    if (empty($desc)) {
+    if (empty($info)) {
       if ($this->display->display_title == $this->definition['title']) {
         $info = t('View: !view', array('!view' => $this->view->get_human_name()));
       }
@@ -134,7 +133,7 @@ class views_plugin_display_block extends views_plugin_display {
         $form['#title'] .= t('Block admin description');
         $form['block_description'] = array(
           '#type' => 'textfield',
-          '#description' => t('This will appear as the name of this block in administer >> structure >> blocks.'),
+          '#description' => t('This will appear as the name of this block when adding it to a layout at administer >> structure >> layouts.'),
           '#default_value' => $this->get_option('block_description'),
         );
         break;
