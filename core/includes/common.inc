@@ -330,8 +330,9 @@ function backdrop_get_favicon() {
       global $theme;
       $theme_data = list_themes();
       $theme_object = $theme_data[$theme];
-      if (file_exists($favicon = dirname($theme_object->filename) . '/favicon.ico')) {
-        $favicon['path'] = file_create_url($favicon);
+      $theme_favicon = dirname($theme_object->filename) . '/favicon.ico';
+      if (file_exists($theme_favicon)) {
+        $favicon['path'] = file_create_url($theme_favicon);
       }
     }
     elseif ($site_config->get('site_favicon_path')) {
@@ -7785,7 +7786,6 @@ function backdrop_parse_info_file($filename, $process_sections = FALSE) {
  */
 function backdrop_parse_info_format($data, $process_sections = FALSE) {
   $info = array();
-  $constants = get_defined_constants();
 
   // Separate by sections and parse individually if requested.
   if ($process_sections) {
@@ -7845,8 +7845,8 @@ function backdrop_parse_info_format($data, $process_sections = FALSE) {
       }
 
       // Handle PHP constants.
-      if (isset($constants[$value])) {
-        $value = $constants[$value];
+      if (preg_match('/^\w+$/', $value) && defined($value)) {
+        $value = constant($value);
       }
 
       // Insert actual value.

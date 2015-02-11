@@ -8,7 +8,7 @@
 /**
  * The current system version.
  */
-define('BACKDROP_VERSION', '1.0.1');
+define('BACKDROP_VERSION', '1.0.3');
 
 /**
  * Core API compatibility.
@@ -2662,8 +2662,7 @@ function _backdrop_bootstrap_configuration() {
   }
 
   // Check that the config directory is not empty.
-  if (!empty($GLOBALS['config_directories']['active']) && !defined('MAINTENANCE_MODE')) {
-    $directory = $GLOBALS['config_directories']['active'];
+  if (!defined('MAINTENANCE_MODE') && ($directory = config_get_config_directory('active'))) {
     if (!(is_file($directory . '/system.core.json') || is_file($directory . '/system.performance.json'))) {
       throw new Exception("The configuration directory in settings.php is specified as '$directory', but this directory is either empty or missing crucial files. Check that the \$config_directories variable is correct in settings.php.");
     }
