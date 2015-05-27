@@ -694,6 +694,11 @@ class UserCancelTestCase extends BackdropWebTestCase {
     // Load real user object.
     $account = user_load($account->uid, TRUE);
 
+    // Enable comment subjects on 'page' nodes
+    $node_type = node_type_get_type('page');
+    $node_type->settings['comment_subject_field'] = TRUE;
+    node_type_save($node_type);
+    
     // Create a simple node.
     $node = $this->backdropCreateNode(array('uid' => $account->uid));
 
@@ -1536,6 +1541,8 @@ class UserAccountLinksUnitTests extends BackdropWebTestCase {
  * Test user blocks.
  */
 class UserBlocksUnitTests extends BackdropWebTestCase {
+  protected $profile = 'minimal';
+
   /**
    * Tests the secondary menu.
    */
@@ -1562,9 +1569,9 @@ class UserBlocksUnitTests extends BackdropWebTestCase {
     // Check that the user login block is not vulnerable to information
     // disclosure to third party sites.
     $this->backdropLogout();
-    $this->backdropPost('http://example.com/', $edit, t('Log in'), array('external' => FALSE));
+    $this->backdropPost('<front>', $edit, t('Log in'), array('query' => array('destination' => 'http://example.com/')));
     // Check that we remain on the site after login.
-    $this->assertEqual(url('user/' . $user->uid, array('absolute' => TRUE)), $this->getUrl(), 'Redirected to user profile page after login from the frontpage');
+    $this->assertEqual(url('node', array('absolute' => TRUE)), $this->getUrl(), 'Redirected to frontpage and not external site after login.');
   }
 
   function setUp() {
@@ -1801,6 +1808,11 @@ class UserSignatureTestCase extends BackdropWebTestCase {
    * upon display.
    */
   function testUserSignature() {
+    // Enable comment subjects on 'page' nodes
+    $node_type = node_type_get_type('page');
+    $node_type->settings['comment_subject_field'] = TRUE;
+    node_type_save($node_type);
+    
     // Create a new node with comments on.
     $node = $this->backdropCreateNode(array('comment' => COMMENT_NODE_OPEN));
 

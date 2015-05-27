@@ -8,7 +8,7 @@
 /**
  * The current system version.
  */
-define('BACKDROP_VERSION', '1.0.5');
+define('BACKDROP_VERSION', '1.1.1');
 
 /**
  * Core API compatibility.
@@ -2948,7 +2948,7 @@ function backdrop_installation_attempted() {
  *
  * This would include implementations of hook_install(), which could run
  * during the Backdrop installation phase, and might also be run during
- * non-installation time, such as while installing the module from the the
+ * non-installation time, such as while installing the module from the
  * module administration page.
  *
  * Example usage:
