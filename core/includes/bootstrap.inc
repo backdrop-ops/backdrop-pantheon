@@ -7,7 +7,7 @@
 /**
  * The current system version.
  */
-define('BACKDROP_VERSION', '1.3.3');
+define('BACKDROP_VERSION', '1.3.4');
 
 /**
  * Core API compatibility.
@@ -947,7 +947,9 @@ function backdrop_get_filename($type, $name, $filename = NULL) {
       // Layouts we use the existing registry rather than the system table.
       if ($type === 'layout' && function_exists('layout_get_layout_info')) {
         $layout_info = layout_get_layout_info($name);
-        $files[$type][$name] = $layout_info['path'] . '/' . $layout_info['name'] . '.info';
+        if ($layout_info) {
+          $files[$type][$name] = $layout_info['path'] . '/' . $layout_info['name'] . '.info';
+        }
       }
       // Modules, themes, and profiles pull from the system table.
       elseif (function_exists('db_query')) {
@@ -3802,9 +3804,14 @@ function backdrop_is_cli() {
 
 /**
  * Detects if this is an HTML HTTP request.
+ *
+ * This liberal detection considers all requests that lack an Accept header or
+ * X-Requested-With (as set by jQuery and other JavaScript libraries) to be
+ * an HTML request. Any other types of requests must specify X-Requested-With
+ * in order to be returned in an alternative format.
  */
 function backdrop_is_html() {
-  return ((empty($_SERVER['HTTP_ACCEPT']) || $_SERVER['HTTP_ACCEPT'] === '*/*') && empty($_SERVER['X_REQUESTED_WITH'])) || strpos($_SERVER['HTTP_ACCEPT'], 'text/html') === 0;
+  return strpos($_SERVER['HTTP_ACCEPT'], 'text/html') === 0 || empty($_SERVER['HTTP_ACCEPT']) || empty($_SERVER['HTTP_X_REQUESTED_WITH']);
 }
 
 /**
