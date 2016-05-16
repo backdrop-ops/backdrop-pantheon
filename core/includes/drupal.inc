@@ -731,8 +731,8 @@ function drupal_html_to_text($string, $allowed_tags = NULL) {
 function drupal_required_modules() {
   return backdrop_required_modules();
 }
-function drupal_alter($type, &$data, &$context1 = NULL, &$context2 = NULL) {
-  return backdrop_alter($type, $data, $context1, $context2);
+function drupal_alter($type, &$data, &$context1 = NULL, &$context2 = NULL, &$context3 = NULL) {
+  return backdrop_alter($type, $data, $context1, $context2, $context3);
 }
 // Functions from path.inc.
 function drupal_path_initialize() {
@@ -757,7 +757,7 @@ function drupal_match_path($path, $patterns) {
   return backdrop_match_path($path, $patterns);
 }
 function drupal_path_alias_whitelist_rebuild($source = NULL) {
-  return;
+  return array();
 }
 function drupal_valid_path($path, $dynamic_allowed = FALSE) {
   return backdrop_valid_path($path, $dynamic_allowed);
