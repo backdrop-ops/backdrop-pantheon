@@ -1843,14 +1843,14 @@ class NodeBlockFunctionalTest extends BackdropWebTestCase {
     $edit = array(
       'title' => 'Post layout',
       'name' => 'post_layout',
-      'layout' => 'two_column',
+      'layout_template' => 'moscone_flipped',
       'path' => 'node/%',
     );
     $this->backdropPost('admin/structure/layouts/add', $edit, t('Create layout'));
 
     // Add a condition to specify only the post type should have this layout.
     $this->backdropPost('admin/structure/layouts/manage/post_layout/settings', array(), t('Add visibility condition'));
-    $this->backdropPost(NULL, array('condition' => 'node_type'), t('Add visibility condition'));
+    $this->backdropPost(NULL, array('condition' => 'node_type'), t('Load condition'));
     $this->backdropPost(NULL, array('bundles[post]' => 1), t('Add visibility condition'));
     $this->backdropPost(NULL, array(), t('Save layout'));
 
@@ -2537,6 +2537,7 @@ class NodeEntityViewModeAlterTest extends NodeWebTestCase {
  * Tests the cache invalidation of node operations.
  */
 class NodePageCacheTest extends NodeWebTestCase {
+  protected $profile = 'minimal';
 
   /**
    * An admin user with administrative permissions for nodes.
@@ -2548,6 +2549,11 @@ class NodePageCacheTest extends NodeWebTestCase {
 
     config_set('system.core', 'cache', 1);
     config_set('system.core', 'page_cache_maximum_age', 300);
+
+    $this->backdropCreateContentType(array(
+      'type' => 'page',
+      'name' => 'Page',
+    ));
 
     $this->admin_user = $this->backdropCreateUser(array(
         'bypass node access',

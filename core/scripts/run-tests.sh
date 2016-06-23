@@ -55,6 +55,10 @@
  *
  *  --verbose   Output detailed assertion messages in addition to summary.
  *
+ *  --summary [file]
+ *
+ *              Output errors and exception messages to summary file.
+ *
  *  <test1>[ <test2>[ <test3> ...]]
  *
  *              One or more tests classes (or groups names) to be run. Names may
@@ -126,6 +130,27 @@ if ($args['clean']) {
   foreach ($messages as $text) {
     echo " - " . $text . "\n";
   }
+
+  // Clean up profiles cache tables.
+  simpletest_script_clean_profile_cache_tables();
+  echo "\nProfile cache tables cleaned.\n";
+
+  // Get the status messages and print them.
+  $messages = array_pop(backdrop_get_messages('status'));
+  foreach ($messages as $text) {
+    echo " - " . $text . "\n";
+  }
+
+  // Clean up profiles cache folders.
+  simpletest_script_clean_profile_cache_folders();
+  echo "\nProfile cache folders cleaned.\n";
+
+  // Get the status messages and print them.
+  $messages = array_pop(backdrop_get_messages('status'));
+  foreach ($messages as $text) {
+    echo " - " . $text . "\n";
+  }
+
   exit(0);
 }
 
@@ -148,6 +173,24 @@ if ($args['list']) {
     }
   }
   exit(0);
+}
+
+// Generate cache tables for profiles.
+if ($args['cache']) {
+  $profiles = array(
+    'minimal',
+    'standard',
+    'testing',
+  );
+
+  simpletest_script_init(NULL);
+
+  echo "\nPreparing database and configuration cache for profiles\n";
+  foreach($profiles as $profile){
+    simpletest_script_prepare_profile_cache($profile);
+    echo " - " . $profile . " - " . "ready\n";
+
+  }
 }
 
 $test_list = simpletest_script_get_test_list();
@@ -179,6 +222,10 @@ simpletest_script_reporter_display_results();
 
 if ($args['xml']) {
   simpletest_script_reporter_write_xml_results();
+}
+
+if($args['summary']) {
+  simpletest_script_write_summary($args['summary']);
 }
 
 // Cleanup our test results.
@@ -238,6 +285,13 @@ All arguments are long options.
 
   --verbose   Output detailed assertion messages in addition to summary.
 
+  --cache     Generate cache for instalation profiles to boost tests speed.
+
+  --summary [file]
+
+              Output errors and exception messages to summary file.
+
+
   <test1>[ <test2>[ <test3> ...]]
 
               One or more tests classes (or groups names) to be run. Names may
@@ -269,6 +323,7 @@ function simpletest_script_parse_args() {
     'url' => '',
     'php' => '',
     'concurrency' => 1,
+    'cache' => FALSE,
     'split' => '',
     'force' => FALSE,
     'all' => FALSE,
@@ -282,6 +337,7 @@ function simpletest_script_parse_args() {
     'test-id' => 0,
     'execute-test' => '',
     'xml' => '',
+    'summary' => '',
   );
 
   // Override with set values.
@@ -406,8 +462,21 @@ function simpletest_script_init($server_software) {
     }
   }
 
-  chdir(realpath(__DIR__ . '/../..'));
-  define('BACKDROP_ROOT', getcwd());
+  /**
+   * Defines the root directory of the Backdrop installation.
+   *
+   * The dirname() function is used to get path to Backdrop root folder, which
+   * avoids resolving of symlinks. This allows the code repository to be a symlink
+   * and hosted outside of the web root. See issue #1297.
+   *
+   * The realpath is important here to avoid FAILURE with filetransfer.tests. 
+   * When realpath used, BACKDROP_ROOT contain full path to backdrop root folder.
+   */
+  define('BACKDROP_ROOT', realpath(dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME'])))));
+
+  // Change the directory to the Backdrop root.
+  chdir(BACKDROP_ROOT);
+
   require_once BACKDROP_ROOT . '/core/includes/bootstrap.inc';
 }
 
@@ -645,6 +714,52 @@ function simpletest_script_reporter_init() {
 }
 
 /**
+ * Write a summary of any test failures to a separate file.
+ *
+ * @param string $summary_file
+ *   The path to a file to which the summary will be written.
+ */
+function simpletest_script_write_summary($summary_file) {
+  global $test_list, $args, $test_id, $results_map;
+
+  $summary = '';
+  $results = db_query("SELECT * FROM {simpletest} WHERE test_id = :test_id AND (status = 'exception' OR status = 'fail') ORDER BY test_class, message_id", array(':test_id' => $test_id));
+  $test_class = '';
+  $count = 0;
+  foreach ($results as $result) {
+    if (isset($results_map[$result->status])) {
+      if ($result->test_class != $test_class) {
+        // Display test class every time results are for new test class.
+        $test_class = $result->test_class;
+        $info = simpletest_test_get_by_class($test_class);
+        $test_group = $info['group'];
+        $test_name = $info['name'];
+        $summary .= "\n$test_group: $test_name ($test_class)\n";
+        $test_class = $result->test_class;
+      }
+      
+      if($count < 10 ){
+        $summary .= " - `" . $result->status . "` " . trim(strip_tags($result->message)) . ' **' . basename($result->file) . '**:' . $result->line . "\n";
+      }
+      $count++;
+    }
+  }
+  
+  if($count > 10 ){
+    $summary .= "\nResult limited to first 10 items. More details are available from the full log.\n";
+  }
+  
+  $total_count = db_query("SELECT COUNT(*) FROM {simpletest} WHERE test_id = :test_id AND status IN ('fail', 'pass')", array(':test_id' => $test_id))->fetchField();
+  if(!empty($summary)){
+    $summary = format_plural($count, '1 of !total_count tests failed', '@count of !total_count tests failed.', array('!total_count' => $total_count)) . "\n" . $summary;
+  } 
+  else{
+    $summary = format_plural($total_count, '1 test passed', '@count tests passed.');
+  }
+  file_put_contents($summary_file, $summary);
+}
+
+/**
  * Display jUnit XML test results.
  */
 function simpletest_script_reporter_write_xml_results() {
@@ -782,7 +897,7 @@ function simpletest_script_format_result($result) {
 
   simpletest_script_print($summary, $result->status);
 
-  $lines = explode("\n", wordwrap(trim(strip_tags($result->message)), 76));
+  $lines = explode("\n", wordwrap(trim(strip_tags(decode_entities($result->message))), 76));
   foreach ($lines as $line) {
     echo "    $line\n";
   }
@@ -873,5 +988,66 @@ function simpletest_script_print_alternatives($string, $array, $degree = 4) {
     foreach ($alternatives as $alternative) {
       simpletest_script_print("  - $alternative\n", SIMPLETEST_SCRIPT_COLOR_FAIL);
     }
+  }
+}
+
+/**
+ * Removes cached profile tables from the database.
+ */
+function simpletest_script_clean_profile_cache_tables(){
+  $tables = db_find_tables(Database::getConnection()->prefixTables('{simpletest_cache_}') . '%');
+  $count = 0;
+  foreach ($tables as $table) {
+    db_drop_table($table);
+    $count++;
+  }
+
+  if ($count > 0) {
+    backdrop_set_message(format_plural($count, 'Removed 1 profile cache table.', 'Removed @count profile cache tables.'));
+  }
+  else {
+    backdrop_set_message(t('No profile cache tables to remove.'));
+  }
+}
+
+/**
+ * Removes cached profile folders from the database.
+ */
+function simpletest_script_clean_profile_cache_folders(){
+  $profiles = array(
+    'minimal',
+    'standard',
+    'testing',
+  );
+
+  $file_public_path = config_get('system.core', 'file_public_path', 'files');
+
+  foreach($profiles as $profile) {
+    // Delete temporary files directory.
+    file_unmanaged_delete_recursive($file_public_path . '/simpletest/simpletest_cache_' . $profile);
+    backdrop_set_message(t('Cleared cache folder for profile !profile.', array('!profile' => $profile)));
+  }
+}
+
+/**
+ * Removed profile cached tables from the database.
+ */
+function simpletest_script_prepare_profile_cache($profile){
+  try {
+    backdrop_page_is_cacheable(FALSE);
+    backdrop_bootstrap(BACKDROP_BOOTSTRAP_FULL);
+    backdrop_page_is_cacheable(TRUE);
+
+    require_once BACKDROP_ROOT . '/core/modules/simpletest/backdrop_web_test_case_cache.php';
+
+    $test = new BackdropWebTestCaseCache();
+    $test->setProfile($profile);
+    if (!$test->isCached()) {
+      $test->prepareCache();
+    }
+  }
+  catch (Exception $e) {
+    simpletest_script_print_error($e->getMessage());
+    exit(1);
   }
 }

@@ -180,8 +180,14 @@ function path_admin_form($form, &$form_state, $path = array('source' => '', 'ali
       '#type' => 'submit',
       '#value' => t('Delete'),
       '#submit' => array('path_admin_form_delete_submit'),
+      '#limit_validation_errors' => array(array('actions'), array('pid')),
     );
   }
+  $form['actions']['cancel'] = array(
+    '#type' => 'link',
+    '#title' => t('Cancel'),
+    '#href' => isset($_GET['destination']) ? $_GET['destination'] : 'admin/config/search/path',
+  );
 
   return $form;
 }
@@ -483,7 +489,7 @@ function path_patterns_settings_form($form) {
 
   $form['max_length'] = array(
     '#type' => 'number',
-    '#title' => t('Maximum alias length'),
+    '#title' => t('Maximum URL alias length'),
     '#default_value' => $config->get('max_length'),
     '#step' => 1,
     '#min' => 1,
@@ -500,21 +506,26 @@ function path_patterns_settings_form($form) {
     '#description' => t('Maximum text length of any component in the alias (e.g., [title]). 100 is the recommended length. @max is the maximum possible length.', array('@max' => $max_length)),
   );
 
-  $description = t('What should be done when updating an existing content item which already has an alias?');
+  $description = t('The action taken when an item already has an alias.');
+  $delete_label = t('Create a new alias. Delete the old alias.');
   if (module_exists('redirect')) {
+    $auto_redirect = config_get('redirect.settings', 'auto_redirect');
     $description .= ' ' . t('The <a href="!url">Redirect module settings</a> affect whether a redirect is created when an alias is deleted.', array('!url' => url('admin/config/search/redirect/settings')));
+    if ($auto_redirect) {
+      $delete_label = t('Create a new alias. Replace the old alias with a redirect.');
+    }
   }
   else {
-    $description .= ' ' . t('Considering installing the <a href="!url">Redirect module</a> to get redirects when your aliases change.', array('!url' => 'https://github.com/backdrop-contrib/redirect'));
+    $description .= ' ' . t('Considering enabling the Redirect module on the <a href="!url">modules page</a> to create redirects when your aliases change.', array('admin/modules'));
   }
   $form['update_action'] = array(
     '#type' => 'radios',
     '#title' => t('Update action'),
     '#default_value' => $config->get('update_action'),
     '#options' => array(
-      PATH_UPDATE_ACTION_NO_NEW => t('Do nothing. Leave the old alias intact.'),
+      PATH_UPDATE_ACTION_DELETE => $delete_label,
       PATH_UPDATE_ACTION_LEAVE => t('Create a new alias. Leave the existing alias functioning.'),
-      PATH_UPDATE_ACTION_DELETE => t('Create a new alias. Delete the old alias.'),
+      PATH_UPDATE_ACTION_NO_NEW => t('Do nothing. Leave the old alias intact.'),
     ),
     '#description' => $description,
   );
@@ -774,12 +785,12 @@ function path_admin_bulk_delete($form, $form_state) {
 
   /* TODO:
    1) all - DONE
-   2) all node aliases - DONE
-   4) all user aliases - DONE
-   5) all taxonomy aliases - DONE
+   2) all content URL aliases - DONE
+   4) all user URL aliases - DONE
+   5) all taxonomy term URL aliases - DONE
    6) by node type
    7) by taxonomy vocabulary
-   8) no longer existing aliases (see http://drupal.org/node/128366)
+   8) no longer existing URL aliases (see http://drupal.org/node/128366)
    9) where src like 'pattern' - DON'T DO
    10) where dst like 'pattern' - DON'T DO
   */
