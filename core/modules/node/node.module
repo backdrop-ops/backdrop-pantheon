@@ -1215,6 +1215,9 @@ function node_permission() {
     'view own unpublished content' => array(
       'title' => t('View own unpublished content'),
     ),
+    'view any unpublished content' => array(
+      'title' => t('View any unpublished content'),
+    ),
     'view revisions' => array(
       'title' => t('View content revisions'),
     ),
@@ -1644,7 +1647,6 @@ function node_menu() {
     'type' => MENU_VISIBLE_IN_BREADCRUMB,
     'file' => 'node.types.inc',
   );
-
   $items['node'] = array(
     'page callback' => 'node_page_default',
     'access arguments' => array('access content'),
@@ -1658,15 +1660,19 @@ function node_menu() {
     'menu_name' => 'management',
     'weight' => -20,
   );
+
   $items['rss.xml'] = array(
     'title' => 'RSS feed',
     'page callback' => 'node_feed',
     'access arguments' => array('access content'),
+    // Prevent Layout from affecting our markup by specifying delivery callback.
+    'delivery callback' => 'backdrop_deliver_html_page',
     'type' => MENU_CALLBACK,
     // Pass a FALSE and array argument to ensure that additional path components
     // are not passed to node_feed().
     'page arguments' => array(FALSE, array()),
   );
+
   // @todo Remove this loop when we have a 'description callback' property.
   // Resets the internal static cache of _node_types_build() and forces a
   // rebuild of the node type information.
@@ -1757,6 +1763,15 @@ function node_menu() {
     'access arguments' => array(1, 'delete'),
     'file' => 'node.pages.inc',
   );
+  $items['node/autocomplete'] = array(
+    'title' => 'Node autocomplete',
+    'page callback' => 'node_autocomplete',
+    'access callback' => 'user_access',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'node.pages.inc',
+  );
+
   return $items;
 }
 
@@ -1850,6 +1865,11 @@ function node_block_info() {
     'info' => t('Recent content'),
     'description' => t('A list of recently published content.'),
   );
+  $blocks['content'] = array(
+    'info' => t('Existing content'),
+    'description' => t('Embed existing node content as a block onto other pages'),
+    'class' => 'NodeBlock',
+  );
 
   return $blocks;
 }
@@ -1863,12 +1883,14 @@ function node_block_view($delta = '', $settings = array()) {
 
   switch ($delta) {
     case 'syndicate':
-      $block['subject'] = t('Syndicate');
-      $block['content'] = array(
-        '#theme' => 'feed_icon',
-        '#url' => 'rss.xml',
-        '#title' => t('Syndicate'),
-      );
+      if (backdrop_valid_path('rss.xml')) {
+        $block['subject'] = t('Syndicate');
+        $block['content'] = array(
+          '#theme' => 'feed_icon',
+          '#url' => 'rss.xml',
+          '#title' => t('Syndicate'),
+        );
+      }
       break;
 
     case 'recent':
@@ -1888,7 +1910,9 @@ function node_block_view($delta = '', $settings = array()) {
         }
       }
       break;
+
   }
+
   return $block;
 }
 
@@ -1924,11 +1948,15 @@ function node_block_configure($delta = '', $settings = array()) {
 function node_get_recent($number = 10) {
   $query = db_select('node', 'n');
 
-  if (!user_access('bypass node access')) {
-    // If the user is able to view their own unpublished nodes, allow them
-    // to see these in addition to published nodes. Check that they actually
-    // have some unpublished nodes to view before adding the condition.
-    if (user_access('view own unpublished content') && $own_unpublished = db_query('SELECT nid FROM {node} WHERE uid = :uid AND status = :status', array(':uid' => $GLOBALS['user']->uid, ':status' => NODE_NOT_PUBLISHED))->fetchCol()) {
+  if (!user_access('bypass node access') && !user_access('view any unpublished content')) {
+    // If the user is able to view unpublished nodes, allow them to see these
+    // in addition to published nodes. Check that they actually have some
+    // unpublished nodes to view before adding the condition.
+    // Note: this query still ignores unpublished by type permissions.
+    // See: https://github.com/backdrop/backdrop-issues/issues/146.
+    $own_unpublished = db_query('SELECT nid FROM {node} WHERE uid = :uid AND status = :status',
+     array(':uid' => $GLOBALS['user']->uid, ':status' => NODE_NOT_PUBLISHED))->fetchCol();
+    if (user_access('view own unpublished content') && $own_unpublished) {
       $query->condition(db_or()
         ->condition('n.status', NODE_PUBLISHED)
         ->condition('n.nid', $own_unpublished, 'IN')
@@ -1970,6 +1998,8 @@ function node_get_recent($number = 10) {
  *   The link should be an absolute URL.
  *
  * @see node_menu()
+ *
+ * @deprecated since 1.5.0
  */
 function node_feed($nids = FALSE, $channel = array()) {
   global $base_url, $language_content;
@@ -2091,51 +2121,57 @@ function node_view_multiple($nodes, $view_mode = 'teaser', $weight = 0, $langcod
  * @see node_menu()
  */
 function node_page_default() {
-  $site_config = config('system.core');
-  $select = db_select('node', 'n')
-    ->fields('n', array('nid', 'sticky', 'created'))
-    ->condition('n.promote', 1)
-    ->condition('n.status', 1)
-    ->orderBy('n.sticky', 'DESC')
-    ->orderBy('n.created', 'DESC')
-    ->extend('PagerDefault')
-    ->limit($site_config->get('default_nodes_main'))
-    ->addTag('node_access');
-
-  $nids = $select->execute()->fetchCol();
-
-  if (!empty($nids)) {
-    $nodes = node_load_multiple($nids);
-    $build = node_view_multiple($nodes);
-
-    // 'rss.xml' is a path, not a file, registered in node_menu().
-    backdrop_add_feed('rss.xml', $site_config->get('site_name') . ' ' . t('RSS'));
-    $build['pager'] = array(
-      '#theme' => 'pager',
-      '#weight' => 5,
-    );
-    backdrop_set_title('');
+  // Check for custom <front> page
+  $front = config_get('system.core', 'site_frontpage');
+  if ($front != 'node') {
+    backdrop_goto('<front>', array(), '301');
   }
   else {
-    backdrop_set_title(t('Welcome to @site-name', array('@site-name' => $site_config->get('site_name'))), PASS_THROUGH);
+    $site_config = config('system.core');
+    $select = db_select('node', 'n')
+      ->fields('n', array('nid', 'sticky', 'created'))
+      ->condition('n.promote', 1)
+      ->condition('n.status', 1)
+      ->orderBy('n.sticky', 'DESC')
+      ->orderBy('n.created', 'DESC')
+      ->extend('PagerDefault')
+      ->limit($site_config->get('default_nodes_main'))
+      ->addTag('node_access');
 
-    $default_message = '<p>' . t('No front page content has been created yet.') . '</p>';
+    $nids = $select->execute()->fetchCol();
 
-    $default_links = array();
-    if (_node_add_access()) {
-      $default_links[] = l(t('Add content'), 'node/add');
+    if (!empty($nids)) {
+      $nodes = node_load_multiple($nids);
+      $build = node_view_multiple($nodes);
+
+      // 'rss.xml' is a path, not a file, registered in node_menu().
+      backdrop_add_feed('rss.xml', $site_config->get('site_name') . ' ' . t('RSS'));
+      $build['pager'] = array(
+        '#theme' => 'pager',
+        '#weight' => 5,
+      );
+      backdrop_set_title('');
     }
-    if (!empty($default_links)) {
-      $default_message .= theme('item_list', array('items' => $default_links));
-    }
+    else {
+      backdrop_set_title(t('Welcome to @site-name', array('@site-name' => $site_config->get('site_name'))), PASS_THROUGH);
 
-    $build['default_message'] = array(
-      '#markup' => $default_message,
-      '#prefix' => '<div id="first-time">',
-      '#suffix' => '</div>',
-    );
+      $default_message = '<p>' . t('No content has been promoted yet.') . '</p>';
+      $default_links = array();
+      if (_node_add_access()) {
+        $default_links[] = l(t('Add content'), 'node/add');
+      }
+      if (!empty($default_links)) {
+        $default_message .= theme('item_list', array('items' => $default_links));
+      }
+
+      $build['default_message'] = array(
+        '#markup' => $default_message,
+        '#prefix' => '<div id="first-time">',
+        '#suffix' => '</div>',
+      );
+    }
+    return $build;
   }
-  return $build;
 }
 
 /**
@@ -2460,6 +2496,12 @@ function node_access($op, $node, $account = NULL) {
     return FALSE;
   }
   elseif (in_array(NODE_ACCESS_ALLOW, $access, TRUE)) {
+    $rights[$account->uid][$cid][$op] = TRUE;
+    return TRUE;
+  }
+
+  // Check if user can view any unpublished nodes.
+  if ($op == 'view' && !$node->status && user_access('view any unpublished content', $account) && $account->uid != 0) {
     $rights[$account->uid][$cid][$op] = TRUE;
     return TRUE;
   }
@@ -3470,6 +3512,8 @@ function node_autoload_info() {
   return array(
     'Node' => 'node.entity.inc',
     'NodeStorageController' => 'node.entity.inc',
+
+    'NodeBlock' => 'node.block.inc',
 
     // Views handlers.
     'views_handler_argument_node_created_fulldate' => 'views/views_handler_argument_dates_various.inc',
