@@ -1,0 +1,7 @@
+type = module
+name = View mode test
+description = Testing module.
+backdrop = 1.x
+version = BACKDROP_CORE
+hidden = TRUE
+
