@@ -157,24 +157,75 @@ Backdrop.formatString = function(str, args) {
   // Transform arguments before inserting them.
   for (var key in args) {
     if (args.hasOwnProperty(key)) {
-       switch (key.charAt(0)) {
-         // Escaped only.
-         case '@':
-           args[key] = Backdrop.checkPlain(args[key]);
-        break;
+      switch (key.charAt(0)) {
+        // Escaped only.
+        case '@':
+          args[key] = Backdrop.checkPlain(args[key]);
+          break;
         // Pass-through.
-         case '!':
-           break;
-         // Escaped and placeholder.
-         case '%':
-         default:
-           args[key] = Backdrop.theme('placeholder', args[key]);
-           break;
-       }
-       str = str.replace(key, args[key]);
+        case '!':
+          break;
+        // Escaped and placeholder.
+        case '%':
+          default:
+          args[key] = Backdrop.theme('placeholder', args[key]);
+          break;
+      }
     }
   }
-  return str;
+  return Backdrop.stringReplace(str, args, null);
+};
+
+/**
+ * Replace substring.
+ *
+ * The longest keys will be tried first. Once a substring has been replaced,
+ * its new value will not be searched again.
+ *
+ * @param {String} str
+ *   A string with placeholders.
+ * @param {Object} args
+ *   Key-value pairs.
+ * @param {Array|null} keys
+ *   Array of keys from the "args".  Internal use only.
+ *
+ * @return {String}
+ *   Returns the replaced string.
+ */
+Backdrop.stringReplace = function (str, args, keys) {
+  if (str.length === 0) {
+    return str;
+  }
+
+  // If the array of keys is not passed then collect the keys from the args.
+  if (!$.isArray(keys)) {
+    keys = [];
+    for (var k in args) {
+      if (args.hasOwnProperty(k)) {
+        keys.push(k);
+      }
+    }
+
+    // Order the keys by the character length. The shortest one is the first.
+    keys.sort(function (a, b) { return a.length - b.length; });
+  }
+
+  if (keys.length === 0) {
+    return str;
+  }
+
+  // Take next longest one from the end.
+  var key = keys.pop();
+  var fragments = str.split(key);
+
+  if (keys.length) {
+    for (var i = 0; i < fragments.length; i++) {
+      // Process each fragment with a copy of remaining keys.
+      fragments[i] = Backdrop.stringReplace(fragments[i], args, keys.slice(0));
+    }
+  }
+
+  return fragments.join(args[key]);
 };
 
 /**
@@ -401,6 +452,29 @@ Backdrop.getSelection = function (element) {
     return { 'start': start, 'end': end };
   }
   return { 'start': element.selectionStart, 'end': element.selectionEnd };
+};
+
+/**
+ * Add a global variable which determines if the window is being unloaded.
+ *
+ * This is primarily used by Backdrop.displayAjaxError().
+ */
+Backdrop.beforeUnloadCalled = false;
+$(window).bind('beforeunload pagehide', function () {
+    Backdrop.beforeUnloadCalled = true;
+});
+
+/**
+ * Displays a JavaScript error from an Ajax response when appropriate to do so.
+ */
+Backdrop.displayAjaxError = function (message) {
+  // Skip displaying the message if the user deliberately aborted (for example,
+  // by reloading the page or navigating to a different page) while the Ajax
+  // request was still ongoing. See, for example, the discussion at
+  // http://stackoverflow.com/questions/699941/handle-ajax-error-when-a-user-clicks-refresh.
+  if (!Backdrop.beforeUnloadCalled) {
+    alert(message);
+  }
 };
 
 /**
