@@ -1,0 +1,9 @@
+@import "modules/functions";
+@import "modules/global";
+@import "modules/colors";
+
+.node.view-mode-teaser {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom:1px solid $border;
+}
