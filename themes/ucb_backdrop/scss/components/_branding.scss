@@ -1,0 +1,25 @@
+@import "modules/functions";
+@import "modules/global";
+
+
+.brand-header {
+  background:#000;
+  padding:10px 0;
+  img.cu-boulder-logo {
+    display: block;
+    width:100%;
+    max-width:240px;
+    height: auto;
+  }
+}
+.l-header {
+  background-color: #fff;
+  .header-site-name-wrapper {
+    padding:20px 0;
+    font-weight:900;
+    font-size:20px;
+    a {
+      color:#000 !important;
+    }
+  }
+}

@@ -1,0 +1,5 @@
+name = Express Dashboards
+description = Provides as extendable dashboard system.
+package = Express
+type = module
+backdrop = 1.x

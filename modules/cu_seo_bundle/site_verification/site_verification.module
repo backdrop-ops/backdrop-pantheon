@@ -1,0 +1,172 @@
+<?php
+
+/**
+ * @file
+ * Outputs files and META tags for verifying site ownership.
+ *
+ * @author David Kent Norman
+ * @link http://deekayen.net/
+ */
+
+/**
+ * Implements hook_config_info();
+ */
+function site_verification_config_info() {
+  $prefixes = array();
+  $prefixes['site_verification.settings'] = array(
+    'group' => t('Configuration'),
+    'label' => t('Site verification settings'),
+  );
+  return $prefixes;
+}
+
+/**
+ * Implements hook_perm().
+ */
+function site_verification_permission() {
+  return array(
+    'administer site verification' => array(
+      'title' => t('Administer site verification'),
+      'description' => t('Change site verification information.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ *
+ * @return array
+ */
+function site_verification_menu() {
+  $items = array();
+
+  $items['admin/config/services/site_verification'] = array(
+    'title' => 'Site verification',
+    'description' => 'Verify site ownership with Bing, Google, WOT, and Yandex.',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('site_verification_admin_settings'),
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site verification'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'site_verification.admin.inc',
+  );
+
+  /* since this would get skipped on during the module install
+   a _submit() hook was added to the settings form to force
+   a menu rebuild so this can be captured if a Google verification
+   URL was added. */
+  if ($bing_link = config_get('site_verification.settings', 'bing_meta')) {
+    $items['BingSiteAuth.xml'] = array(
+      'page callback' => 'site_verification_verify_bing',
+      'page arguments' => array($bing_link),
+      'type' => MENU_CALLBACK,
+      'access callback' => 'site_verification_access',
+    );
+  }
+  if ($google_link = config_get('site_verification.settings', 'google_html')) {
+    $items[$google_link] = array(
+      'page callback' => 'site_verification_verify_google',
+      'page arguments' => array($google_link),
+      'type' => MENU_CALLBACK,
+      'access callback' => 'site_verification_access',
+    );
+  }
+  if ($yandex_uin = config_get('site_verification.settings', 'yandex_uin')) {
+    $items['yandex_' . $yandex_uin . '.txt'] = array(
+      'page callback' => 'site_verification_verify_yandex',
+      'page arguments' => array($yandex_uin),
+      'type' => MENU_CALLBACK,
+      'access callback' => 'site_verification_access',
+    );
+  }
+
+  return $items;
+}
+
+/**
+ * Everyone gets to see the verification file!
+ */
+function site_verification_access() {
+  return TRUE;
+}
+
+/**
+ * Prints a verification string for Bing verification.
+ */
+function site_verification_verify_bing($content) {
+  watchdog('site_verification', 'Bing verification accessed by ' . getenv('HTTP_USER_AGENT'), array(), WATCHDOG_DEBUG);
+  die('<?xml version="1.0"?>
+<users>
+  <user>' . trim(check_plain($content)) . '</user>
+</users>');
+}
+
+/**
+ * Prints a verification string for Google search console.
+ */
+function site_verification_verify_google($filename) {
+  watchdog('site_verification', 'Google verification accessed by ' . getenv('HTTP_USER_AGENT'), array(), WATCHDOG_DEBUG);
+  die('google-site-verification: '. trim(check_plain($filename)));
+}
+
+/**
+ * Prints a verification string for Yandex verification.
+ */
+function site_verification_verify_yandex($uin) {
+  header('Content-type: text/plain');
+  watchdog('site_verification', 'Yandex verification accessed by ' . getenv('HTTP_USER_AGENT'), array(), WATCHDOG_DEBUG);
+  die(trim(check_plain($uin)));
+}
+
+/**
+ * Implements hook_preprocess_page().
+ */
+function site_verification_preprocess_page(&$variables) {
+  $bing_meta = config_get('site_verification.settings', 'bing_meta');
+  if (!empty($bing_meta)) {
+    $element = array(
+      '#tag' => 'meta',
+      '#attributes' => array(
+        'name' => 'msvalidate.01',
+        'content' => trim(check_plain($bing_meta)),
+      ),
+    );
+    backdrop_add_html_head($element, 'msvalidate.01');
+  }
+
+  $google_meta = config_get('site_verification.settings', 'google_meta');
+  if (!empty($google_meta)) {
+    $element = array(
+      '#tag' => 'meta',
+      '#attributes' => array(
+        'name' => 'google-site-verification',
+        'content' => trim(check_plain($google_meta)),
+      ),
+    );
+    backdrop_add_html_head($element, 'google-site-verification');
+  }
+
+  $wot_meta = config_get('site_verification.settings', 'wot_meta');
+  if (!empty($wot_meta)) {
+    $element = array(
+      '#tag' => 'meta',
+      '#attributes' => array(
+        'name' => 'wot-verification',
+        'content' => trim(check_plain($wot_meta)),
+      ),
+    );
+    backdrop_add_html_head($element, 'wot-verification');
+  }
+
+  $yandex_uin = config_get('site_verification.settings', 'yandex_uin');
+  if (!empty($yandex_uin)) {
+    $element = array(
+      '#tag' => 'meta',
+      '#attributes' => array(
+        'name' => 'yandex-verification',
+        'content' => trim(check_plain($yandex_uin)),
+      ),
+    );
+    backdrop_add_html_head($element, 'yandex-verification');
+  }
+}

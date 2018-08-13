@@ -1,0 +1,7 @@
+name = Express User Dashboard
+description = Adds a user dashbaord
+package = Express
+type = module
+backdrop = 1.x
+
+dependencies[] = express_dashboards

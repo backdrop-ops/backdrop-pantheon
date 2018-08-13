@@ -1,0 +1,14 @@
+type = theme
+name = CU Boulder
+description = CU Boulder Backdrop theme.
+backdrop = 1.x
+version = 1.x
+
+stylesheets[all][] = css/ucb-backdrop.css
+
+stylesheets[all][] = menu-dropdown.theme.css
+
+libraries[] = bootstrap4-gs
+
+settings[site_contact_information][value] = 'Put your contact information here'
+settings[site_contact_information][format] = 'filtered_html'

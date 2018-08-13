@@ -1,0 +1,10 @@
+name = Site verification
+description = Display files and META tags for site ownership verification.
+backdrop = 1.x
+type = module
+configure = admin/config/services/site_verification
+
+; Added by Backdrop CMS packaging script on 2018-07-20
+project = site_verification
+version = 1.x-1.0.2
+timestamp = 1532100099

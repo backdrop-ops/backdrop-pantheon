@@ -1,0 +1,11 @@
+name = GitHub API
+description = GitHub API integration.
+backdrop = 1.x
+package = API
+configure = admin/config/system/githubapi
+type = module
+
+; Added by Backdrop CMS packaging script on 2016-08-20
+project = githubapi
+version = 1.x-1.0.5
+timestamp = 1471740345
