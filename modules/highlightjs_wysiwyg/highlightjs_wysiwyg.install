@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * @file
+ * Install hooks for the highlightjs_wysiwyg.
+ */
+
+/**
+ * Implements hook_install().
+ *
+ * @throws \Exception
+ */
+function highlightjs_wysiwyg_install() {
+  // @todo Figure out how to automatically enable this filter on install since WYSIWYG module has changed.
+//  $res = db_query('SELECT settings FROM {wysiwyg}')->fetchCol();
+//  $settings = unserialize($res[0]);
+//  $settings['buttons']['code_sc'] = ['code_sc_button' => 1];
+//  $serial_settings = serialize($settings);
+//
+//  try {
+//    db_update('wysiwyg')
+//      ->fields(['settings' => $serial_settings])
+//      ->condition('editor', 'ckeditor', '=')
+//      ->execute();
+//  } catch (Exception $exception) {
+//    watchdog('csh', $exception->getMessage());
+//  }
+}
