@@ -1,0 +1,14 @@
+type = module
+name = XML sitemap custom
+description = Adds user configurable links to the sitemap.
+package = XML sitemap
+backdrop = 1.x
+
+dependencies[] = xmlsitemap
+
+configure = admin/config/search/xmlsitemap/custom
+
+; Added by Backdrop CMS packaging script on 2018-08-06
+project = xmlsitemap
+version = 1.x-1.0.4
+timestamp = 1533595676
