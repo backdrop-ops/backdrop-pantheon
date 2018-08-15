@@ -332,23 +332,16 @@ $settings['404_fast_html'] = '<!DOCTYPE html><html><head><title>404 Not Found</t
 $settings['backdrop_drupal_compatibility'] = TRUE;
 
 /**
- * Include a local settings file.
- *
- * To make local development easier, you can add a file that contains your local
- * database connection information. This local settings file can be ignored in
- * your Git repository so that any updates to settings.php can be pulled in 
- * without overwriting your local changes.
- */
-if (file_exists(__DIR__ . '/settings.local.php')) {
-  include __DIR__ . '/settings.local.php';
-}
-
-/**
  * Pantheon specific compatibility.
  *
  * Override the database information to pass the correct Database credentials
- * directly from Pantheon to Backdrop.
+ * directly from Pantheon to Backdrop and allow a local settings file to be stored
+ * in an instance specific location that isn't impacted by file cloning and
+ * code deployments,
  */
 if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
   $_SERVER['BACKDROP_SETTINGS'] = $_SERVER['PRESSFLOW_SETTINGS'];
+  if (file_exists('../.drush/settings.local.php')) {
+    include '../.drush/settings.local.php';
+  }
 }
