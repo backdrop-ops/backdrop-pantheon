@@ -337,7 +337,7 @@ $settings['backdrop_drupal_compatibility'] = TRUE;
  * Override the database information to pass the correct Database credentials
  * directly from Pantheon to Backdrop and allow a local settings file to be stored
  * in an instance specific location that isn't impacted by file cloning and
- * code deployments,
+ * code deployments.
  */
 if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
   $_SERVER['BACKDROP_SETTINGS'] = $_SERVER['PRESSFLOW_SETTINGS'];
