@@ -1,0 +1,14 @@
+name = Hightlight.js WYSIWYG Integration
+description = Adds a shortcode for using HighlightJS in the WYSIWYG editor.
+type = module
+backdrop = 1.x
+package = CK Editor
+version = 7.x-1.0
+
+dependencies[] = ckeditor
+dependencies[] = shortcode
+
+; Added by Backdrop CMS packaging script on 2018-08-13
+project = highlightjs_wysiwyg
+version = 1.x-1.0.0
+timestamp = 1534201056

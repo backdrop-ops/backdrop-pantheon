@@ -1,0 +1,8 @@
+{
+  "_config_name": "highlightjs_wysiwyg.settings",
+  "csh_enabled_node_types": [
+    "page",
+    "post"
+  ],
+  "csh_theme": "hybrid"
+}

@@ -1,0 +1,130 @@
+<?php
+
+/**
+ * @file
+ * Contains Backdrop hooks for the highlightjs_wysiwyg module.
+ */
+
+/**
+ * Implements hook_config_info().
+ */
+function highlightjs_wysiwyg_config_info() {
+  $prefixes['highlightjs_wysiwyg.settings'] = array(
+    'label' => t('Code Syntax Highlighting Bundle Settings'),
+    'group' => t('CK Editor'),
+  );
+  return $prefixes;
+}
+
+/**
+ * Implements of hook_shortcode_info().
+ */
+function highlightjs_wysiwyg_shortcode_info() {
+  return [
+    'code' => [
+      'title' => t('Insert Code Syntax'),
+      'description' => t('Insert PHP, JS, and HTML code and render via the highlight.js library.'),
+      'process callback' => 'csh_code_callback',
+      'tips callback' => 'csh_code_tips',
+    ],
+  ];
+}
+
+/**
+ * Render the shortcode.
+ *
+ * @param array $attrs
+ * @param null|string $content
+ *
+ * @return string
+ */
+function csh_code_callback($attrs, $content = NULL) {
+  return "<pre><code class=\"{$attrs['lang']}\">{$content}</code></pre>";
+}
+
+/**
+ * Help text displayed on "/filter/tips".
+ *
+ * @return string
+ */
+function csh_code_tips() {
+  return '[code lang="php"]$foo = "bar";[/code]';
+}
+
+/**
+ * Implements hook_filter_info_alter().
+ */
+//function highlightjs_wysiwyg_filter_info_alter(&$info) {
+//  // Dynamically enable the code shortcode for the WYSIWYG filter.
+//  $format = filter_format_load('wysiwyg');
+//  // @todo Fix deprecation notice.
+//  $filters = filter_list_format($format->format);
+//  $filters['shortcode']->settings['code'] = 1;
+//}
+
+/**
+ * Implements hook_page_alter().
+ */
+function highlightjs_wysiwyg_preprocess_page(&$variables) {
+  // Add the JS and CSS assets if the page is supposed to have code syntax highlighting.
+  $current_object = menu_get_object();
+  if (in_array($current_object->type, config_get('highlightjs_wysiwyg.settings','csh_enabled_node_types'), TRUE)) {
+    backdrop_add_css(backdrop_get_path('module', 'highlightjs_wysiwyg')
+      . '/libraries/highlightjs/styles/' . config_get('highlightjs_wysiwyg.settings','csh_theme') . '.css');
+    backdrop_add_css(backdrop_get_path('module', 'highlightjs_wysiwyg')
+      . '/css/csh.css');
+
+    // @todo Update the library and provide instructions to override the custom packaged build.
+    backdrop_add_js(backdrop_get_path('module', 'highlightjs_wysiwyg')
+      . '/libraries/highlightjs/highlight.pack.js');
+    backdrop_add_js('jQuery(document).ready(function () { hljs.initHighlightingOnLoad(); });', array(
+      'type' => 'inline',
+      'scope' => 'footer',
+    ));
+  }
+}
+
+/**
+ * Implements of hook_wysiwyg_plugin().
+ */
+function highlightjs_wysiwyg_wysiwyg_plugin($editor, $version) {
+  // Add the code button for the ckeditor.
+  if ($editor === 'ckeditor') {
+    return array(
+      'code_sc' => array(
+        'path' => backdrop_get_path('module', 'highlightjs_wysiwyg') . '/plugins/code_sc',
+        'buttons' => array(
+          'code_sc_button' => t('Code Shortcode Generator'),
+        ),
+        'load' => TRUE,
+      ),
+    );
+  }
+}
+
+/**
+ * Implements hook_ckeditor_plugins().
+ */
+function highlightjs_wysiwyg_ckeditor_plugins() {
+  $plugins['csh'] = array(
+    'path' => backdrop_get_path('module', 'highlightjs_wysiwyg') . '/plugins/code_sc',
+    'file' => 'plugin.js',
+    'internal' => FALSE,
+    // 'css' => array(backdrop_get_path('module', 'mymodule') . '/css/myplugin.css'),
+    'enabled callback' => 'csh_plugin_check',
+    'buttons' => array(
+      'CSH' => array(
+        'label' => t('Code Syntax Highlighting'),
+        'image' =>  backdrop_get_path('module', 'highlightjs_wysiwyg') . '/plugins/code_sc/images/code_sc_button.png',
+        'image_alternative' =>'{code}',
+        //'dependencies' => array('contextmenu'),
+      ),
+    ),
+  );
+
+  return $plugins;
+}
+
+function csh_plugin_check() {
+  return TRUE;
+}
