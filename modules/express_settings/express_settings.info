@@ -1,0 +1,8 @@
+name = Express Settings
+description = Allows Site Owner to update specific configurations without 'administer site configuration' permission.
+backdrop = 1.x
+type = module
+package = Express
+
+;dependencies[] = varnish
+dependencies[] = googleanalytics
