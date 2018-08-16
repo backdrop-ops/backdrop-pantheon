@@ -28,7 +28,7 @@ function ucb_backdrop_preprocess_node(&$vars) {
     if (!empty($vars['field_tags'])) {
       $tags = array();
       foreach ($vars['field_tags'] as $tag) {
-        $tags[] = l($tag['taxonomy_term']->name, $tag['tid']);
+        $tags[] = l($tag['taxonomy_term']->name, $tag['taxonomy_term']->path['alias']);
       }
       $vars['post_tags'] = join(', ', $tags);
     }
