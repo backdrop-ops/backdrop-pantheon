@@ -1,0 +1,7 @@
+name = Shortcode Embed Content Tag
+description = "Provides a shortcode tag for embedding a node content into text."
+type = module
+package = Core
+version = 1.x
+backdrop = 1.x
+dependencies[] = shortcode
