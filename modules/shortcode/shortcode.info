@@ -1,0 +1,7 @@
+
+name = Shortcode
+description = Provides shortcodes filter framework and API (like WP shortcodes)
+type = module
+package = Core
+version = 1.x
+backdrop = 1.x
