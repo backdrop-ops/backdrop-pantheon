@@ -1,0 +1,36 @@
+@charset "UTF-8";
+.element-invisible1 { border: 0; height: 1px; overflow: hidden; padding: 0; position: absolute !important; width: 1px; white-space: nowrap; }
+
+body { background: #000; }
+
+.l-wrapper { background: #fff; padding: 1px 0 20px; }
+
+.l-footer { background: #f4f4f4; padding: 20px 0; }
+
+.brand-footer { color: #fff; padding: 20px 0; }
+.brand-footer a { color: #cfb87c; }
+
+.container-fluid { padding-right: 1.25rem; padding-left: 1.25rem; }
+
+@media (min-width: 75em) { .container { max-width: 75rem; } }
+body { font-family: "Neue Helvetica W01", "Helvetica Neue", Helvetica, Arial, sans-serif; font−size:  (1.6)rem; }
+
+a { text-decoration: none; }
+
+a { color: #0277BD; }
+a:hover { color: #B71C1C; }
+
+.block-system-main-menu { margin-bottom: 20px; }
+.block-system-main-menu ul { border-top: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0; }
+.block-system-main-menu ul, .block-system-main-menu li { list-style: none; list-style-image: none; margin: 0; padding: 0; }
+.block-system-main-menu ul li { display: inline; }
+.block-system-main-menu ul li a { display: inline-block; line-height: 40px; padding: 0 10px; color: #202020; font-size: 85%; }
+
+.node.view-mode-teaser { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; }
+
+.brand-header { background: #000; padding: 10px 0; }
+.brand-header img.cu-boulder-logo { display: block; width: 100%; max-width: 240px; height: auto; }
+
+.l-header { background-color: #fff; }
+.l-header .header-site-name-wrapper { padding: 20px 0; font-weight: 900; font-size: 20px; }
+.l-header .header-site-name-wrapper a { color: #000 !important; }

@@ -1,0 +1,6 @@
+name = Shortcode Basic Tags
+description = Provides basic shortcode tags like highlight, dropcap, etc.
+type = module
+package = Core
+version = 1.x
+backdrop = 1.x

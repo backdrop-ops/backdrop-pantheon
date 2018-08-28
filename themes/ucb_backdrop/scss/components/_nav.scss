@@ -1,0 +1,30 @@
+@import "modules/functions";
+@import "modules/global";
+@import "modules/colors";
+
+
+.block-system-main-menu {
+
+  margin-bottom: 20px;
+  ul {
+    border-top: 1px solid $border;
+    border-bottom:1px solid $border;
+  }
+  ul, li {
+    list-style: none;
+    list-style-image: none;
+    margin: 0;
+    padding: 0;
+  }
+  ul li {
+    display: inline;
+    a {
+      display: inline-block;
+      line-height: 40px;
+      padding:0 10px;
+      color:#202020;
+      font-size: 85%;
+    }
+  }
+
+}

@@ -1,0 +1,9 @@
+name = CU SEO Dashboard
+description = Adds a SEO dashbaord
+package = SEO
+type = module
+backdrop = 1.x
+
+dependencies[] = express_dashboards
+
+stylesheets[all][] = css/cu-dashboard-seo.css

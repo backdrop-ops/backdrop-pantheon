@@ -1,0 +1,4 @@
+nav.header-menu { border-top: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px; }
+nav.header-menu ul, nav.header-menu li { list-style: none; list-style-image: none; margin: 0; padding: 0; }
+nav.header-menu ul li { display: inline; }
+nav.header-menu ul li a { display: inline-block; line-height: 40px; padding: 0 10px; }

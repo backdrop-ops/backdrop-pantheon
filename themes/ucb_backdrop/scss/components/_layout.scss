@@ -1,0 +1,13 @@
+@import "modules/functions";
+@import "modules/global";
+
+.container-fluid {
+  padding-right: rem(20);
+  padding-left: rem(20);
+}
+
+@media (min-width: 75em) {
+  .container {
+      max-width: rem(1200);
+  }
+}

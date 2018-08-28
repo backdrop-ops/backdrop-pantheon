@@ -1,0 +1,19 @@
+@import "modules/functions";
+@import "modules/global";
+@import "modules/colors";
+
+body {
+  font-family: $base_font;
+  @include font-size(16);
+}
+
+a {
+  text-decoration: none;
+}
+
+a {
+  color:$blue;
+  &:hover {
+    color:$red;
+  }
+}
