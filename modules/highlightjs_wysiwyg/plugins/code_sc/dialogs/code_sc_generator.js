@@ -8,8 +8,8 @@ CKEDITOR.dialog.add('code_sc_generatorDialog', function (editor) {
 
   return {
     title: 'Code Syntax Highlighting',
-    minWidth: 400,
-    minHeight: 300,
+    minWidth: 600,
+    minHeight: 450,
     contents: [
       {
         id: 'tab-settings',
@@ -28,6 +28,7 @@ CKEDITOR.dialog.add('code_sc_generatorDialog', function (editor) {
               ['CSS', 'css'],
               ['Bash', 'bash'],
               ['SQL', 'sql'],
+              ['YAML', 'yaml'],
             ],
             'default': 'php'
           },
