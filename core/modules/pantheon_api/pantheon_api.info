@@ -1,0 +1,6 @@
+name = Pantheon Platform API
+description = Integration with the Pantheon Platform
+version = "1.x-1.0"
+package = Pantheon
+backdrop = 1.x
+type = module

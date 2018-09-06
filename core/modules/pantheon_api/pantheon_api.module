@@ -1,0 +1,23 @@
+<?php
+
+/**
+ * @file 
+ * Pantheon platform specific functionality for Backdrop.
+ * 
+ * See: https://github.com/pantheon-systems/drops-7/tree/master/modules/pantheon/pantheon_api
+ */
+
+/**
+ * Flush all image style files in one bulk operation.
+ */
+function pantheon_api_image_path_flush($path) {
+  $styles = image_styles();
+  $paths = array();
+  foreach($styles as $style) {
+    $image_path = image_style_path($style['name'], $path);
+    $paths[] = '/' . file_uri_target($image_path);
+  }
+  if (count($paths) > 0 && function_exists('pantheon_bulk_file_delete')) {
+    pantheon_bulk_file_delete($paths);
+  }
+}
