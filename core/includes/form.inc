@@ -1389,8 +1389,8 @@ function _form_validate(&$elements, &$form_state, $form_id = NULL) {
           $value = in_array($elements['#type'], array('checkboxes', 'tableselect')) ? array_keys($elements['#value']) : $elements['#value'];
           foreach ($value as $v) {
             if (!isset($options[$v])) {
-              form_error($elements, $t('An illegal choice has been detected. Please contact the site administrator.'));
-              watchdog('form', 'Illegal choice %choice in !name element.', array('%choice' => $v, '!name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title']), WATCHDOG_ERROR);
+              form_error($elements, $t('Invalid option %choice in %name element.', array('%choice' => $v, '%name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title'])));
+              watchdog('form', 'Invalid option %choice in %name element.', array('%choice' => $v, '%name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title']), WATCHDOG_ERROR);
             }
           }
         }
@@ -1408,8 +1408,8 @@ function _form_validate(&$elements, &$form_state, $form_id = NULL) {
           form_set_value($elements, NULL, $form_state);
         }
         elseif (!isset($options[$elements['#value']])) {
-          form_error($elements, $t('An illegal choice has been detected. Please contact the site administrator.'));
-          watchdog('form', 'Illegal choice %choice in %name element.', array('%choice' => $elements['#value'], '%name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title']), WATCHDOG_ERROR);
+          form_error($elements, $t('Invalid option %choice in %name element.', array('%choice' => $elements['#value'], '%name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title'])));
+          watchdog('form', 'Invalid option %choice in %name element.', array('%choice' => $elements['#value'], '%name' => empty($elements['#title']) ? $elements['#parents'][0] : $elements['#title']), WATCHDOG_ERROR);
         }
       }
     }
@@ -2998,6 +2998,9 @@ function form_process_password_confirm($element) {
     '#value' => empty($element['#value']) ? NULL : $element['#value']['pass1'],
     '#required' => $element['#required'],
     '#attributes' => array('class' => array('password-field')),
+    '#password_strength' => TRUE,
+    '#password_shown' => FALSE,
+    '#password_toggle' => FALSE,
   );
   $element['pass2'] =  array(
     '#type' => 'password',
@@ -3005,6 +3008,9 @@ function form_process_password_confirm($element) {
     '#value' => empty($element['#value']) ? NULL : $element['#value']['pass2'],
     '#required' => $element['#required'],
     '#attributes' => array('class' => array('password-confirm')),
+    '#password_strength' => FALSE,
+    '#password_shown' => FALSE,
+    '#password_toggle' => FALSE,
   );
   $element['#element_validate'] = array('password_confirm_validate');
   $element['#tree'] = TRUE;
