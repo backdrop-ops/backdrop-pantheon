@@ -7,7 +7,7 @@
 /**
  * The current system version.
  */
-define('BACKDROP_VERSION', '1.11.5');
+define('BACKDROP_VERSION', '1.12.2');
 
 /**
  * Core API compatibility.
@@ -1728,8 +1728,10 @@ function backdrop_serve_page_from_cache(stdClass $cache) {
   $max_age = !isset($_COOKIE[session_name()]) || isset($hook_boot_headers['vary']) ? config_get('system.core', 'page_cache_maximum_age') : 0;
   $default_headers['Cache-Control'] = 'public, max-age=' . $max_age;
 
-  // Entity tag should change if the output changes.
-  $etag = $cache->created . ($return_compressed ? '-gzip' : '');
+  // Entity tag should change if the output changes. Quotes are required per
+  // header specification:
+  // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag
+  $etag = '"' . $cache->created . ($return_compressed ? '-gzip' : '') . '"';
   header('Etag: ' . $etag);
 
   // See if the client has provided the required HTTP headers.
@@ -4343,7 +4345,9 @@ function backdrop_clear_opcode_cache($filepath) {
 
   // Zend OPcache.
   if (function_exists('opcache_invalidate')) {
-    opcache_invalidate($filepath, TRUE);
+    // Suppress any warnings in PHP 7.2+ caused by "Zend OPcache API is
+    // restricted by "restrict_api" configuration directive".
+    @opcache_invalidate($filepath, TRUE);
   }
   // APC.
   if (function_exists('apc_delete_file')) {
