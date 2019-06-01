@@ -7,7 +7,7 @@
 /**
  * The current system version.
  */
-define('BACKDROP_VERSION', '1.12.7');
+define('BACKDROP_VERSION', '1.13.2');
 
 /**
  * Core API compatibility.
@@ -2721,6 +2721,7 @@ function backdrop_array_merge_deep_array($arrays) {
 function backdrop_anonymous_user() {
   // Because this is called early in the bootstrap (starting the session) it
   // must not use the autoloader, so it's pulled in manually.
+  require_once BACKDROP_ROOT . '/core/includes/userinterface.inc';
   require_once BACKDROP_ROOT . '/core/includes/anonymous.inc';
   $user = new AnonymousUser(array(
     'hostname' => ip_address(),
