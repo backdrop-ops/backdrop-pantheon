@@ -1194,8 +1194,6 @@ function backdrop_alter($type, &$data, &$context1 = NULL, &$context2 = NULL, &$c
  *   The name of the module (without the .module extension).
  * @param integer $weight
  *   The weight to set, as an integer.
- *
- * @since 1.17.2 Function added.
  */
 function module_set_weight($module, $weight) {
   db_update('system')
