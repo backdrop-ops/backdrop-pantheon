@@ -657,36 +657,34 @@ tr.selected td {
  *   to apply all padding to the inner .fieldset-wrapper instead.
  */
 fieldset {
-  position: relative;
   max-width: 100%;
   margin: 1em 0;
   padding: 0;
-  border-radius: 4px;
   background-color: #fff;
-  border: 2px solid #eaeaea;
+  border: none;
   min-width: 0;
 }
 fieldset .fieldset-legend {
-  position: relative;
-  left: 0; /* LTR */
-  top: 0;
   display: block;
-  width: 100%;
-  padding-left: 15px; /* LTR */
   box-sizing: border-box;
+  border: 2px solid #EAEAEA;
+  border-radius: 4px;
+  background-color: #fff;
 }
-fieldset:not(.collapsible) > legend > .fieldset-legend {
-  margin-top: .35em;
-  margin-bottom: .35em;
+fieldset:not(.collapsible) .fieldset-legend {
+  padding: .3em .3em .3em 1em; /* LTR */
 }
-[dir="rtl"] fieldset .fieldset-legend {
-  right: 0;
-  padding-right: 15px;
-  padding-left: 0;
+[dir="rtl"] fieldset:not(.collapsible) .fieldset-legend {
+  padding: .3em 1em .3em .3em;
 }
+fieldset:not(.collapsible) .fieldset-legend,
+fieldset.collapsible:not(.collapsed) .fieldset-legend {
+  border-bottom: none;
+}
+
 legend {
   font-size: 120%;
-  float: left;
+  font-weight: normal;
   width: 100%;
 }
 [dir="rtl"] legend {
@@ -705,15 +703,15 @@ fieldset fieldset fieldset {
 /**
  * Collapsible Fieldsets
  */
-.js fieldset.collapsible {
-  position: relative;
-}
 fieldset .fieldset-wrapper {
-  padding: 0 13px 13px 15px; /* LTR */
-  clear: both;
+  padding: 15px 13px 13px 15px; /* LTR */
+  border-radius: 0 0 4px 4px;
+  border: 2px solid #EAEAEA;
+  border-top: none;
+  margin-top: -2px;
 }
 [dir="rtl"] fieldset .fieldset-wrapper {
-  padding: 0 15px 13px 13px;
+  padding: 15px 15px 13px 13px;
 }
 fieldset .fieldset-wrapper::before {
   content: "";
@@ -725,8 +723,6 @@ fieldset .fieldset-wrapper::before {
   z-index: 1;
   display: block;
   padding: .3em .3em .3em 1.8em;
-  margin: 0 0 0 -.5em;
-  border-radius: 4px;
   background: transparent;
 }
 .js[dir="rtl"] fieldset.collapsible .fieldset-title {
@@ -735,13 +731,14 @@ fieldset .fieldset-wrapper::before {
   margin: 0 -.5em 0 0;
 }
 .js fieldset.collapsible .fieldset-legend {
+  border-radius: 4px 4px 0 0;
   font-size: 1em;
 }
 .js fieldset.collapsible .fieldset-legend a:before {
   content: "";
   position: absolute;
-  left: .6em;
-  top: .8em;
+  left: .8em;
+  top: .9em;
   width: 0;
   height: 0;
   border: .32em solid transparent;
@@ -750,7 +747,7 @@ fieldset .fieldset-wrapper::before {
 }
 .js[dir="rtl"] fieldset.collapsible .fieldset-legend a:before {
   left: auto;
-  right: .6em;
+  right: .8em;
 }
 .fieldset-legend span.summary {
   position: absolute;
@@ -770,15 +767,21 @@ fieldset .fieldset-wrapper::before {
   }
 }
 /* Collapsed state styles */
+.js fieldset.collapsed {
+  padding: 0;
+}
+.js fieldset.collapsed .fieldset-legend {
+  border-radius: 4px;
+}
 .js fieldset.collapsed .fieldset-legend a:before {
-  left: .8em;
+  left: 1em;
   top: .75em;
   border: .32em solid transparent;
   border-left-color: black;
 }
 .js[dir="rtl"] fieldset.collapsed .fieldset-legend a:before {
   left: auto;
-  right: .8em;
+  right: 1em;
   border-left-color: transparent;
   border-right-color: black;
 }
