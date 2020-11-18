@@ -677,7 +677,6 @@ fieldset:not(.collapsible) .fieldset-legend,
 fieldset.collapsible:not(.collapsed) .fieldset-legend {
   border-bottom: none;
 }
-
 legend {
   font-size: 120%;
   font-weight: normal;
@@ -712,16 +711,6 @@ fieldset fieldset fieldset {
 /**
  * Collapsible Fieldsets
  */
-fieldset .fieldset-wrapper {
-  padding: 15px 13px 13px 15px; /* LTR */
-  border-radius: 0 0 4px 4px;
-  border: 2px solid #EAEAEA;
-  border-top: none;
-  margin-top: -2px;
-}
-[dir="rtl"] fieldset .fieldset-wrapper {
-  padding: 15px 15px 13px 13px;
-}
 .js fieldset.collapsible .fieldset-title {
   position: relative;
   z-index: 1;
@@ -751,6 +740,12 @@ fieldset .fieldset-wrapper {
 .js[dir="rtl"] fieldset.collapsible .fieldset-legend a:before {
   left: auto;
   right: .8em;
+}
+.js fieldset.collapsible legend {
+  float: left;
+}
+.js[dir="rtl"] fieldset.collapsible legend {
+  float: right;
 }
 .fieldset-legend span.summary {
   position: absolute;
