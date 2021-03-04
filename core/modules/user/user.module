@@ -3190,7 +3190,7 @@ function user_register_submit($form, &$form_state) {
   $user_email_verification = config_get('system.core', 'user_email_verification');
   $admin = $form_state['values']['administer_users'];
 
-  if (!$user_email_verification || $admin) {
+  if (!$user_email_verification) || $admin) {
     $pass = $form_state['values']['pass'];
   }
   else {
