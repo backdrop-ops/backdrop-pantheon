@@ -754,15 +754,6 @@ class Layout {
         }
       }
     }
-    if (!empty($this->orphaned_blocks)) {
-      // Assign orphan blocks to the default or last region,
-      // if the former doesn't exist.
-      end($new_positions);
-      $this->refuge_region = isset($new_layout_info['default region']) ? $new_layout_info['default region'] : key($new_positions);
-      foreach ($this->orphaned_blocks as $uuid) {
-        $new_positions[$this->refuge_region][] = $uuid;
-      }
-    }
 
     // Assign orphan blocks to the default or last region, if the former doesn't
     // exist.

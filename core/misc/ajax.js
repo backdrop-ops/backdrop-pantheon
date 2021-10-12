@@ -652,6 +652,8 @@ Backdrop.ajax.prototype.commands = {
     // Attach all JavaScript behaviors to the new content, if it was
     // successfully added to the page and the elements not part of a larger form
     // (in which case they'll be processed all at once in
+    // Drupal.ajax.prototype.success). The body parent check allows
+    // #ajax['wrapper'] to be optional.
     var alreadyAttached = ajax.form && ajax.form.has(new_content).length > 0;
     if (!alreadyAttached && new_content.parents('body').length > 0) {
       // Apply any settings from the returned JSON if available.
