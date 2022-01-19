@@ -297,8 +297,8 @@ class UserRegistrationTestCase extends UserLoginTestBase {
         $this->backdropPostAJAX(NULL, $edit, 'test_user_field_add_more');
       }
       else {
-        $this->backdropPost(NULL, $edit, t('Add another item'));
-        $this->backdropPost(NULL, $edit, t('Add another item'));
+        $this->backdropPost(NULL, $edit, t('Add another'));
+        $this->backdropPost(NULL, $edit, t('Add another'));
       }
       // Submit with three values.
       $edit['test_user_field[und][1][value]'] = $value + 1;
@@ -579,6 +579,32 @@ class UserLoginTestCase extends UserLoginTestBase {
     );
     $this->backdropPost('user', $edit, t('Log in'));
     $this->assertText(t('Sorry, unrecognized username.'));
+  }
+
+  /**
+   * Attempt to login with an invalid array users and passwords.
+   */
+  function testArrayLoginValues() {
+    $edit = array(
+      'pass' => $this->randomName(8),
+    );
+    $extra_post = '&' . http_build_query(array(
+      'name[0]' => $this->randomName(8),
+      'name[1]' => $this->randomName(8),
+    ));
+    $this->backdropPost('user', $edit, t('Log in'), array(), array(), NULL, $extra_post);
+    $this->assertText(t('Sorry, unrecognized username.'));
+
+    $account = $this->backdropCreateUser(array());
+    $edit = array(
+      'name' => $account->name,
+    );
+    $extra_post = '&' . http_build_query(array(
+      'pass[0]' => $this->randomName(8),
+      'pass[1]' => $this->randomName(8),
+    ));
+    $this->backdropPost('user', $edit, t('Log in'), array(), array(), NULL, $extra_post);
+    $this->assertText(t('Sorry, incorrect password.'));
   }
 }
 
