@@ -8,6 +8,7 @@ drush_version: 8
 filemount: /files
 protected_web_paths:
   - /files/private
+  - /files/config
 
 # See https://pantheon.io/docs/pantheon-yml/#enforce-https--hsts for valid values.
 enforce_https: transitional
