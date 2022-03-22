@@ -13,8 +13,7 @@ function pantheon_apachesolr_update_last_removed() {
 /**
  * Move Pantheon Apache Solr settings from variables to config.
  */
-function pantheon_apachesolr_update_1000()
-{
+function pantheon_apachesolr_update_1000() {
   // Migrate variables to config.
   $config = config('pantheon_apachesolr.settings');
   $config->set('pantheon_apachesolr_schema', update_variable_get('pantheon_apachesolr_schema', ''));
