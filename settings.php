@@ -475,7 +475,6 @@ if (file_exists(__DIR__ . '/settings.local.php')) {
 if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
   $pressflow_settings = json_decode($_SERVER['PRESSFLOW_SETTINGS'], TRUE);
   // Apply the Pantheon settings to the Backdrop settings global.
-  // Note: it will not override any settings set previously.
   $pressflow_settings['settings'] = $pressflow_settings['conf'];
   $_SERVER['BACKDROP_SETTINGS'] = json_encode($pressflow_settings);
 }
