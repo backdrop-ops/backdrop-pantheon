@@ -1,5 +1,4 @@
 {
   "_config_name": "pantheon_apachesolr.settings",
-  "pantheon_apachesolr_schema": "",
-  "pantheon_apachesolr_search_api_solr_service_class": "PantheonApachesolrSearchApiSolrService"
+  "pantheon_apachesolr_schema": ""
 }

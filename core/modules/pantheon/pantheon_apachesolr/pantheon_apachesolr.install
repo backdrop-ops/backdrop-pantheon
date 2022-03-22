@@ -18,14 +18,8 @@ function pantheon_apachesolr_update_1000()
   // Migrate variables to config.
   $config = config('pantheon_apachesolr.settings');
   $config->set('pantheon_apachesolr_schema', update_variable_get('pantheon_apachesolr_schema', ''));
-  $config->set('pantheon_apachesolr_search_api_solr_service_class', update_variable_get('pantheon_apachesolr_search_api_solr_service_class', 'PantheonApachesolrSearchApiSolrService'));
-
   $config->save();
 
   // Delete variables.
   update_variable_del('pantheon_apachesolr_schema');
-  update_variable_del('pantheon_apachesolr_search_api_solr_service_class');
-  update_variable_del('pantheon_apachesolr_schema');
-
-  // @todo where is pantheon_environment being set?
 }
