@@ -476,11 +476,16 @@ if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
   if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
     // It's necessary to unset the injected PRESSFLOW_SETTINGS to override the values.
     $pressflow_settings = json_decode($_SERVER['PRESSFLOW_SETTINGS'], TRUE);
-    unset($pressflow_settings['conf']['file_temporary_path']);
     $_SERVER['PRESSFLOW_SETTINGS'] = json_encode($pressflow_settings);
     $_SERVER['BACKDROP_SETTINGS'] = $_SERVER['PRESSFLOW_SETTINGS'];
+    
+    // Define appropriate location for tmp directory.
+    $config['system.core']['file_temporary_path'] = $pressflow_settings['settings']['file_temporary_path'];
+    
+    // Define appropriate location for public file directory.
+    $config['system.core']['file_public_path'] = $pressflow_settings['settings']['file_public_path'];
+    
+    // Define appropriate location for private files directory. (Optional)
+    // $config['system.core']['file_private_path'] = $pressflow_settings['settings']['file_private_path'];
   }
-
-  // Define appropriate location for tmp directory.
-  $config['system.core']['file_temporary_path'] = $_SERVER['HOME'] . '/tmp';
 }
