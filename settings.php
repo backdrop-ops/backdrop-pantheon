@@ -482,5 +482,5 @@ if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
   }
 
   // Define appropriate location for tmp directory.
-  $config['system.core']['file_temporary_path'] = '/tmp';
+  $config['system.core']['file_temporary_path'] = $_SERVER['HOME'] . '/tmp';
 }
