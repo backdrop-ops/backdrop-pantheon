@@ -469,8 +469,10 @@ if (file_exists(__DIR__ . '/settings.local.php')) {
 /**
  * Pantheon specific compatibility.
  *
- * Override the database information to pass the correct Database credentials
+ * Pass the correct Database credentials and environment variables
  * directly from Pantheon to Backdrop.
+ *
+ * @see See https://github.com/backdrop-ops/backdrop-pantheon/issues/58
  */
 if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
   $pressflow_settings = json_decode($_SERVER['PRESSFLOW_SETTINGS'], TRUE);
