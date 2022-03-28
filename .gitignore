@@ -1,9 +1,10 @@
-# Ignore this file so it can be changed.
-.gitignore
+# Pantheon commits a settings.php for environment-specific settings.
+# Place local settings in settings.local.php
+/settings.local.php
 
-# Ignore configuration files that may contain sensitive information.
-/settings*.php
-sites/*/settings*.php
+# Avoid accidental modification of pantheon.upstream.yml in sites
+# created from this upstream.
+pantheon.upstream.yml
 
 # Ignore paths that contain user-generated content.
 /files

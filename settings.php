@@ -80,13 +80,6 @@ $settings['update_free_access'] = FALSE;
 $settings['hash_salt'] = '';
 
 /**
- * Handle Hash Salt Value on Pantheon.
- */
-if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
-  $settings['hash_salt'] = $_ENV['HASH_SALT'];
-}
-
-/**
  * Trusted host configuration (optional but highly recommended).
  *
  * Since the HTTP Host header can be set by the user making the request, it
@@ -133,15 +126,6 @@ if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
  * @see system_requirements()
  */
 // $settings['trusted_host_patterns'] = array('^www\.example\.com$');
-
-/**
- * "Trusted host settings" are not necessary on Pantheon; traffic will only
- * be routed to your site if the host settings match a domain configured for
- * your site in the dashboard.
- */
-if (defined('PANTHEON_ENVIRONMENT')) {
-  $settings['trusted_host_patterns'][] = '.*';
-}
 
 /**
  * Base URL (optional).
@@ -454,6 +438,16 @@ $settings['backdrop_drupal_compatibility'] = TRUE;
 //$config['system.core']['block_interest_cohort'] = FALSE;
 
 /**
+ * Include the Pantheon-specific settings file.
+ *
+ * The settings.pantheon.php file makes some changes that affect all
+ * environments that this site exists in.  Always include this file, even in
+ * a local development environment, to insure that the site settings remain
+ * consistent.
+ */
+include __DIR__ . "/settings.pantheon.php";
+
+/**
  * Include a local settings file, if available.
  *
  * To make local development easier, you can add a settings.local.php file that
@@ -473,28 +467,4 @@ $settings['backdrop_drupal_compatibility'] = TRUE;
  */
 if (file_exists(__DIR__ . '/settings.local.php')) {
   include __DIR__ . '/settings.local.php';
-}
-
-/**
- * Pantheon specific compatibility.
- *
- * Override the database information to pass the correct Database credentials
- * directly from Pantheon to Backdrop.
- */
-if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
-  if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
-    $pressflow_settings = json_decode($_SERVER['PRESSFLOW_SETTINGS'], TRUE);
-    $pressflow_settings['settings'] = $pressflow_settings['conf'];
-    $_SERVER['PRESSFLOW_SETTINGS'] = json_encode($pressflow_settings);
-    $_SERVER['BACKDROP_SETTINGS'] = $_SERVER['PRESSFLOW_SETTINGS'];
-
-    // Define appropriate location for tmp directory.
-    $config['system.core']['file_temporary_path'] = $pressflow_settings['settings']['file_temporary_path'];
-
-    // Define appropriate location for public file directory.
-    $config['system.core']['file_public_path'] = $pressflow_settings['settings']['file_public_path'];
-
-    // Define appropriate location for private files directory. (Optional)
-    // $config['system.core']['file_private_path'] = $pressflow_settings['settings']['file_private_path'];
-  }
 }
