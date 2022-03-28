@@ -472,10 +472,20 @@ if (file_exists(__DIR__ . '/settings.local.php')) {
  * Override the database information to pass the correct Database credentials
  * directly from Pantheon to Backdrop.
  */
-if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
-  $pressflow_settings = json_decode($_SERVER['PRESSFLOW_SETTINGS'], TRUE);
-  // Apply the Pantheon settings to the Backdrop settings global.
-  // Note: it will not override any settings set previously.
-  $pressflow_settings['settings'] = $settings + $pressflow_settings['conf'];
-  $_SERVER['BACKDROP_SETTINGS'] = json_encode($pressflow_settings);
+if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
+  if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
+    $pressflow_settings = json_decode($_SERVER['PRESSFLOW_SETTINGS'], TRUE);
+    $pressflow_settings['settings'] = $pressflow_settings['conf'];
+    $_SERVER['PRESSFLOW_SETTINGS'] = json_encode($pressflow_settings);
+    $_SERVER['BACKDROP_SETTINGS'] = $_SERVER['PRESSFLOW_SETTINGS'];
+
+    // Define appropriate location for tmp directory.
+    $config['system.core']['file_temporary_path'] = $pressflow_settings['settings']['file_temporary_path'];
+
+    // Define appropriate location for public file directory.
+    $config['system.core']['file_public_path'] = $pressflow_settings['settings']['file_public_path'];
+
+    // Define appropriate location for private files directory. (Optional)
+    // $config['system.core']['file_private_path'] = $pressflow_settings['settings']['file_private_path'];
+  }
 }
