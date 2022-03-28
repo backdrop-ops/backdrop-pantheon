@@ -80,6 +80,13 @@ $settings['update_free_access'] = FALSE;
 $settings['hash_salt'] = '';
 
 /**
+ * Handle Hash Salt Value on Pantheon.
+ */
+if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
+  $settings['hash_salt'] = $_ENV['HASH_SALT'];
+}
+
+/**
  * Trusted host configuration (optional but highly recommended).
  *
  * Since the HTTP Host header can be set by the user making the request, it
