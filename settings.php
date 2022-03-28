@@ -127,11 +127,13 @@ $settings['hash_salt'] = '';
  */
 // $settings['trusted_host_patterns'] = array('^www\.example\.com$');
 
+/**
+ * "Trusted host settings" are not necessary on Pantheon; traffic will only
+ * be routed to your site if the host settings match a domain configured for
+ * your site in the dashboard.
+ */
 if (defined('PANTHEON_ENVIRONMENT')) {
-  if (in_array($_ENV['PANTHEON_ENVIRONMENT'], array('dev', 'test', 'live'))) {
-    $settings['trusted_host_patterns'][] = "{$_ENV['PANTHEON_ENVIRONMENT']}-{$_ENV['PANTHEON_SITE_NAME']}.pantheon.io";
-    $settings['trusted_host_patterns'][] = "{$_ENV['PANTHEON_ENVIRONMENT']}-{$_ENV['PANTHEON_SITE_NAME']}.pantheonsite.io";
-  }
+  $settings['trusted_host_patterns'][] = '.*';
 }
 
 /**
