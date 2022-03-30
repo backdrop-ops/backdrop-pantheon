@@ -59,7 +59,12 @@ if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
  * Issue: https://github.com/backdrop-ops/backdrop-pantheon/issues/62
  */
 if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
-  $settings['hash_salt'] = $_ENV['HASH_SALT'];
+  if (isset($_ENV['HASH_SALT'])) {
+    $settings['hash_salt'] = $_ENV['HASH_SALT'];
+  }
+  elseif (isset($_ENV['DRUPAL_HASH_SALT'])) {
+    $settings['hash_salt'] = $_ENV['DRUPAL_HASH_SALT'];
+  }
 }
 
 /**
