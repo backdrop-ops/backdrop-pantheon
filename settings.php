@@ -127,13 +127,6 @@ $settings['hash_salt'] = '';
  */
 // $settings['trusted_host_patterns'] = array('^www\.example\.com$');
 
-if (defined('PANTHEON_ENVIRONMENT')) {
-  if (in_array($_ENV['PANTHEON_ENVIRONMENT'], array('dev', 'test', 'live'))) {
-    $settings['trusted_host_patterns'][] = "{$_ENV['PANTHEON_ENVIRONMENT']}-{$_ENV['PANTHEON_SITE_NAME']}.pantheon.io";
-    $settings['trusted_host_patterns'][] = "{$_ENV['PANTHEON_ENVIRONMENT']}-{$_ENV['PANTHEON_SITE_NAME']}.pantheonsite.io";
-  }
-}
-
 /**
  * Base URL (optional).
  *
@@ -445,6 +438,16 @@ $settings['backdrop_drupal_compatibility'] = TRUE;
 //$config['system.core']['block_interest_cohort'] = FALSE;
 
 /**
+ * Include the Pantheon-specific settings file.
+ *
+ * The settings.pantheon.php file makes some changes that affect all
+ * environments that this site exists in.  Always include this file, even in
+ * a local development environment, to insure that the site settings remain
+ * consistent.
+ */
+include __DIR__ . "/settings.pantheon.php";
+
+/**
  * Include a local settings file, if available.
  *
  * To make local development easier, you can add a settings.local.php file that
@@ -464,14 +467,4 @@ $settings['backdrop_drupal_compatibility'] = TRUE;
  */
 if (file_exists(__DIR__ . '/settings.local.php')) {
   include __DIR__ . '/settings.local.php';
-}
-
-/**
- * Pantheon specific compatibility.
- *
- * Override the database information to pass the correct Database credentials
- * directly from Pantheon to Backdrop.
- */
-if (isset($_SERVER['PRESSFLOW_SETTINGS'])) {
-  $_SERVER['BACKDROP_SETTINGS'] = $_SERVER['PRESSFLOW_SETTINGS'];
 }
