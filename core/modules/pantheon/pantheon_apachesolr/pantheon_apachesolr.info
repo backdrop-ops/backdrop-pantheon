@@ -1,0 +1,7 @@
+name = Pantheon Apache Solr
+description = Exposes Pantheon's ApacheSolr Service
+package = Pantheon
+version = "1.x-1.0"
+configure = admin/config/search/pantheon
+backdrop = 1.x
+type = module
