@@ -7,7 +7,7 @@
 /**
  * The current system version.
  */
-define('BACKDROP_VERSION', '1.22.1');
+define('BACKDROP_VERSION', '1.22.2');
 
 /**
  * Core API compatibility.
@@ -3788,7 +3788,7 @@ function request_path() {
  * @param $path
  *   A path to break into components. Defaults to the path of the current page.
  *
- * @return string|NULL
+ * @return string|NULL|array
  *   The component specified by $index, or NULL if the specified component was
  *   not found. If called without arguments, it returns an array containing all
  *   the components of the current path.
