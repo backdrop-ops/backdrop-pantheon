@@ -3118,19 +3118,6 @@ function user_form_field_ui_field_edit_form_submit($form, &$form_state) {
   }
 }
 
-/** 
- * Menu callback to create a new account. 
- * 
- * @since 1.23.1 Replaces user_register_form() as menu callback.
- * 
- * @see user_register_form()
- */
-function user_register_page() {
-  // We need to set the page title because this menu entry is a local task.
-  backdrop_set_title(t('Create new account'));
-  return backdrop_get_form('user_register_form');
-}
-
 /**
  * Menu callback to create a new account.
  *
