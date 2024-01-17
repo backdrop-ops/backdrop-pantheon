@@ -396,7 +396,7 @@ function system_element_info() {
     '#input' => TRUE,
     '#cols' => 60,
     '#rows' => 5,
-    '#resizable' => TRUE,
+    '#resizable' => 'vertical',
     '#process' => array('ajax_process_form'),
     '#theme' => 'textarea',
     '#theme_wrappers' => array('form_element'),
@@ -1250,15 +1250,6 @@ function system_library_info() {
     ),
   );
 
-  // Backdrop's resizable textarea.
-  $libraries['backdrop.textarea'] = array(
-    'title' => 'Backdrop resizable textarea',
-    'version' => BACKDROP_VERSION,
-    'js' => array(
-      'core/misc/textarea.js' => array('group' => JS_LIBRARY),
-    ),
-  );
-
   // Backdrop's autocomplete widget.
   $libraries['backdrop.autocomplete'] = array(
     'title' => 'Backdrop autocomplete',
@@ -1431,20 +1422,6 @@ function system_library_info() {
     ),
     'css' => array(
       'core/misc/farbtastic/farbtastic.css' => array(),
-    ),
-  );
-
-  // HTML5 Shiv.
-  $libraries['html5shiv'] = array(
-    'title' => 'html5shiv',
-    'website' => 'http://code.google.com/p/html5shiv/',
-    'version' => '3.7.3',
-    'js' => array(
-      'core/misc/html5.js' => array(
-        'group' => JS_LIBRARY,
-        'weight' => -21,
-        'browsers' => array('IE' => 'lte IE 8', '!IE' => FALSE),
-      ),
     ),
   );
 
