@@ -16,7 +16,25 @@ $database = 'mysql://user:pass@localhost/database_name';
 $database_prefix = '';
 
 /**
- * Site configuration files location.
+ * Configuration storage
+ *
+ * By default configuration will be stored in the filesystem, using the
+ * directories specified in the $config_directories setting. Optionally,
+ * configuration can be store in the database instead of the filesystem.
+ * Switching this option on a live site is not currently supported without some
+ * manual work.
+ *
+ * Example using the database for live and file storage for staging:
+ * @code
+ * $settings['config_active_class'] = 'ConfigDatabaseStorage';
+ * $settings['config_staging_class'] = 'ConfigFileStorage';
+ * @endcode
+ */
+// $settings['config_active_class'] = 'ConfigFileStorage';
+// $settings['config_staging_class'] = 'ConfigFileStorage';
+
+/**
+ * Site configuration files location (if using file storage for configuration)
  *
  * By default these directories are stored within the files directory with a
  * hashed path. For the best security, these directories should be in a location
@@ -192,7 +210,7 @@ ini_set('session.cookie_lifetime', 2000000);
  * http://php.net/manual/en/pcre.configuration.php.
  */
 // ini_set('pcre.backtrack_limit', 200000);
-// ini_set('pcre.recursion_limit', 200000);
+// ini_set('pcre.recursion_limit', 200000);.
 
 /**
  * Backdrop automatically generates a unique session cookie name for each site
@@ -347,7 +365,7 @@ $settings['404_fast_html'] = '<!DOCTYPE html><html lang="en"><head><title>404 No
  *
  * To enable this functionality, uncomment the line below.
  */
-// fast_404();
+// fast_404();.
 
 /**
  * External access proxy settings:
@@ -400,10 +418,10 @@ $settings['404_fast_html'] = '<!DOCTYPE html><html lang="en"><head><title>404 No
 /**
  * Drupal backwards compatibility.
  *
- * By default, Backdrop 1.0 includes a compatibility layer to keep it compatible
+ * By default, Backdrop 1.x includes a compatibility layer to keep it compatible
  * with Drupal 7 APIs. Backdrop core itself does not use this compatibility
- * layer however. You may disable it if all the modules you're running were
- * built for Backdrop.
+ * layer however. You may disable it if all the modules and themes used on the
+ * site were built for Backdrop.
  */
 $settings['backdrop_drupal_compatibility'] = TRUE;
 
@@ -492,6 +510,24 @@ $settings['backdrop_drupal_compatibility'] = TRUE;
  * consistent.
  */
 include __DIR__ . "/settings.pantheon.php";
+
+/**
+ * Sensitive request headers in backdrop_http_request() when following a
+ * redirect.
+ *
+ * By default backdrop_http_request() will strip sensitive request headers when
+ * following a redirect if the redirect location has a different http host to
+ * the original request, or if the scheme downgrades from https to http.
+ *
+ * These variables allow opting out of this behaviour. Careful consideration of
+ * the security implications of opting out is recommended. To opt out, set to
+ * FALSE.
+ *
+ * @see _backdrop_should_strip_sensitive_headers_on_http_redirect()
+ * @see backdrop_http_request()
+ */
+// $config['system.core']['backdrop_http_request']['strip_sensitive_headers_on_host_change'] = TRUE;
+// $config['system.core']['backdrop_http_request']['strip_sensitive_headers_on_https_downgrade'] = TRUE;
 
 /**
  * Include a local settings file, if available.
