@@ -1427,6 +1427,11 @@ class LayoutInterfaceTest extends BackdropWebTestCase {
     );
     $this->backdropPost(NULL, $edit, t('Add visibility condition'));
     $this->backdropPost(NULL, array(), t('Save menu settings'));
+    $vc_text = 'Current path is one of "' . str_replace("\n", ', ', $edit['paths']);
+    $vc = $this->xpath('//tr[contains(@class,"layout-group")]//ul//li[contains(., :vc_text)]', array(
+      ':vc_text' => $vc_text,
+    ));
+    $this->assertEqual(count($vc), 1, 'The visibility condition shows up properly.');
 
     $this->backdropGet('<front>');
     $this->assertLink($menu_title, 0, 'Menu link found on the homepage.');
@@ -2220,7 +2225,8 @@ class LayoutBlockTest extends BackdropWebTestCase {
     $page_title = $this->xpath('(//div[contains(@class, "block-system-title")])//h1');
     $this->assertEqual((string) $page_title[0], 'Test node title');
 
-    // Configure the block to use a custom title that overrides the normal title.
+    // Configure the block to use a custom title that overrides the normal
+    // title.
     $data = array(
       'title_display' => 'custom',
       'title' => 'A & "custom" title',
