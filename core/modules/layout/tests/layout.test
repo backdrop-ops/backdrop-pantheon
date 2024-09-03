@@ -3791,3 +3791,4 @@ class LayoutDeletionTest extends BackdropWebTestCase {
     config_set('system.core', 'site_404', '');
   }
 }
+
