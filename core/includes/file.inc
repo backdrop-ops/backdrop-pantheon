@@ -514,8 +514,8 @@ function file_save_htaccess($directory, $private = TRUE, $force_overwrite = FALS
 
   $htaccess_lines = file_htaccess_lines($private);
 
-  // Write the .htaccess file.
-  if (file_put_contents($htaccess_path, $htaccess_lines)) {
+  // Write the .htaccess file. Suppress any PHP error and write to watchdog.
+  if (@file_put_contents($htaccess_path, $htaccess_lines)) {
     backdrop_chmod($htaccess_path, 0444);
   }
   else {
