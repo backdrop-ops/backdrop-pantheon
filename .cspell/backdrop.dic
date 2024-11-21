@@ -36,6 +36,8 @@ barbaz
 Barepaths
 bartik
 basenames
+basepath
+basetheme
 basethemes
 bitmasks
 bitstring
@@ -73,6 +75,7 @@ cresult
 cript
 csspath
 CURLAUTH
+CURLOPT
 curparts
 curstr
 Dairiki
@@ -91,6 +94,8 @@ devmajor
 devminor
 diffutils
 dimanche
+dialogclose
+dialogopen
 divitis
 docache
 docwilmot
@@ -184,6 +189,7 @@ Htmlto
 httpauth
 HTTPAUTH
 HTTPGET
+HWLDF
 ical
 ICAL
 IDNA
@@ -331,16 +337,19 @@ Optionchecker
 otherjob
 othername
 otherval
+outro
 padder
 pageno
 pagenum
 pagerpieces
+PHPGGC
 phptemplate
 phpwiki
 plid
 plids
 pneum
 Ponedjeljak
+POSTFIELDS
 preenable
 Prefilter
 preinstall
@@ -376,6 +385,7 @@ reparented
 reparenting
 requeing
 restriping
+RETURNTRANSFER
 retval
 rger
 rkey
