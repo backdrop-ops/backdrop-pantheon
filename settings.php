@@ -52,8 +52,12 @@ $database_prefix = '';
  * $config_directories['staging'] = '/home/myusername/config/staging';
  * @endcode
  */
-$config_directories['active'] = 'files/config_' . md5($database) . '/active';
-$config_directories['staging'] = 'files/config_' . md5($database) . '/staging';
+$config_path = 'files/config';
+if (file_exists('files/config_' . md5($database))) {
+  $config_path = 'files/config_' . md5($database);
+}
+$config_directories['active'] = $config_path . '/active';
+$config_directories['staging'] = $config_path . '/staging';
 
 /**
  * Skip the configuration staging directory cleanup
