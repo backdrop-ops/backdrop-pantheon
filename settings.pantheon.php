@@ -86,3 +86,14 @@ if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
 if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
   $settings['trusted_host_patterns'][] = '.*';
 }
+
+/**
+ * Using legacy format for database connection settings and config directories,
+ * to ensure existing sites that may be relying on these settings continue to
+ * work.
+ *
+ * Issue: https://github.com/backdrop-ops/backdrop-pantheon/issues/73
+ */
+$database = 'mysql://user:pass@localhost/database_name';
+$config_directories['active'] = 'files/config_' . md5($database) . '/active';
+$config_directories['staging'] = 'files/config_' . md5($database) . '/staging';
