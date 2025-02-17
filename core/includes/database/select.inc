@@ -265,7 +265,7 @@ interface SelectQueryInterface extends QueryConditionInterface, QueryAlterableIn
    * @param string|null $alias
    *   The alias for the table. In most cases this should be the first letter
    *   of the table, or the first letter of each "word" in the table.
-   * @param array|null $condition
+   * @param string|DatabaseCondition|null $condition
    *   The condition on which to join this table. If the join requires values,
    *   this clause should use a named placeholder and the value or values to
    *   insert should be passed in the 4th parameter. For the first table joined
@@ -289,7 +289,7 @@ interface SelectQueryInterface extends QueryConditionInterface, QueryAlterableIn
    * @param string|null $alias
    *   The alias for the table. In most cases this should be the first letter
    *   of the table, or the first letter of each "word" in the table.
-   * @param string|null $condition
+   * @param string|DatabaseCondition|null $condition
    *   The condition on which to join this table. If the join requires values,
    *   this clause should use a named placeholder and the value or values to
    *   insert should be passed in the 4th parameter. For the first table joined
@@ -313,7 +313,7 @@ interface SelectQueryInterface extends QueryConditionInterface, QueryAlterableIn
    * @param string|null $alias
    *   The alias for the table. In most cases this should be the first letter
    *   of the table, or the first letter of each "word" in the table.
-   * @param string|null $condition
+   * @param string|DatabaseCondition|null $condition
    *   The condition on which to join this table. If the join requires values,
    *   this clause should use a named placeholder and the value or values to
    *   insert should be passed in the 4th parameter. For the first table joined
@@ -337,7 +337,7 @@ interface SelectQueryInterface extends QueryConditionInterface, QueryAlterableIn
    * @param string|null $alias
    *   The alias for the table. In most cases this should be the first letter
    *   of the table, or the first letter of each "word" in the table.
-   * @param string|null $condition
+   * @param string|DatabaseCondition|null $condition
    *   The condition on which to join this table. If the join requires values,
    *   this clause should use a named placeholder and the value or values to
    *   insert should be passed in the 4th parameter. For the first table joined
@@ -369,7 +369,7 @@ interface SelectQueryInterface extends QueryConditionInterface, QueryAlterableIn
    *   The alias for the table. In most cases this should be the first letter
    *   of the table, or the first letter of each "word" in the table. If
    *   omitted, one will be dynamically generated.
-   * @param string|null $condition
+   * @param string|DatabaseCondition|null $condition
    *   The condition on which to join this table. If the join requires values,
    *   this clause should use a named placeholder and the value or values to
    *   insert should be passed in the 4th parameter. For the first table joined
@@ -1083,6 +1083,10 @@ class SelectQuery extends Query implements SelectQueryInterface {
    * If $table is a string, it is taken as the name of a table. If it is
    * a SelectQuery object, it is taken as a subquery.
    *
+   * If $join_condition is a Condition object, any arguments should be
+   * incorporated into the object; a separate array of arguments does not need
+   * to be provided.
+   *
    * @var array
    */
   protected $tables = array();
@@ -1270,6 +1274,10 @@ class SelectQuery extends Query implements SelectQueryInterface {
       if ($table['table'] instanceof SelectQueryInterface) {
         $args += $table['table']->arguments();
       }
+      // If the join condition is an object, grab its arguments recursively.
+      if (!empty($table['condition']) && $table['condition'] instanceof QueryConditionInterface) {
+        $args += $table['condition']->arguments();
+      }
     }
 
     foreach ($this->expressions as $expression) {
@@ -1349,6 +1357,10 @@ class SelectQuery extends Query implements SelectQueryInterface {
       if ($table['table'] instanceof SelectQueryInterface) {
         $table['table']->compile($connection, $queryPlaceholder);
       }
+      // Make sure join conditions are also compiled.
+      if (!empty($table['condition']) && $table['condition'] instanceof QueryConditionInterface) {
+        $table['condition']->compile($connection, $queryPlaceholder);
+      }
     }
 
     // If there are any dependent queries to UNION, compile it recursively.
@@ -1369,6 +1381,11 @@ class SelectQuery extends Query implements SelectQueryInterface {
       // If this table is a subquery, check its status recursively.
       if ($table['table'] instanceof SelectQueryInterface) {
         if (!$table['table']->compiled()) {
+          return FALSE;
+        }
+      }
+      if (!empty($table['condition']) && $table['condition'] instanceof QueryConditionInterface) {
+        if (!$table['condition']->compiled()) {
           return FALSE;
         }
       }
@@ -1971,7 +1988,7 @@ class SelectQuery extends Query implements SelectQueryInterface {
       $query .= $table_string . ' ' . $this->connection->escapeAlias($table['alias']);
 
       if (!empty($table['condition'])) {
-        $query .= ' ON ' . $table['condition'];
+        $query .= ' ON ' . (string) $table['condition'];
       }
     }
 
