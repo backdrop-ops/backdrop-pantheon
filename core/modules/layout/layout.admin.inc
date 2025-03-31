@@ -1999,12 +1999,13 @@ function layout_block_disable_page(Layout $layout, Block $block, $renderer_name)
 /**
  * Form callback; Displays form for adding new conditions to a layout or block.
  *
- * @param Layout $layout
- *   The layout to which a condition is being added.
+ * @param Layout|null $layout
+ *   The layout to which a condition is being added. May be NULL if adding a
+ *   condition to a menu item shared by multiple layouts.
  * @param Block|null $block
  *   If applying a condition to a particular block, the block instance.
  * @param LayoutMenuItem|null $menu_item
- *   If applying a condition to an menu item, the menu item object.
+ *   If applying a condition to a menu item, the menu item object.
  * @param int|null $condition_id
  *   The integer ID of the condition being configured. If adding a new
  *   condition, no value will be passed in. Note that this value may be a
@@ -2014,7 +2015,7 @@ function layout_block_disable_page(Layout $layout, Block $block, $renderer_name)
  *
  * @ingroup forms
  */
-function layout_condition_add_form($form, &$form_state, Layout $layout = NULL, Block $block = NULL, LayoutMenuItem $menu_item = NULL, $condition_id = NULL) {
+function layout_condition_add_form($form, &$form_state, ?Layout $layout = NULL, ?Block $block = NULL, ?LayoutMenuItem $menu_item = NULL, $condition_id = NULL) {
   form_load_include($form_state, 'inc', 'layout', 'layout.admin');
   $form_state['layout'] = $layout;
   $form_state['block'] = $block;
@@ -2317,7 +2318,7 @@ function layout_condition_add_form_submit($form, &$form_state) {
 /**
  * Title callback; Provide the page title for configuring a layout condition.
  */
-function layout_condition_edit_title(Layout $layout = NULL, Block $block = NULL, LayoutMenuItem $menu_item = NULL, $handler_id) {
+function layout_condition_edit_title(?Layout $layout, ?Block $block, ?LayoutMenuItem $menu_item, $handler_id) {
   if (isset($menu_item->conditions[$handler_id])) {
     $plugin_name = $menu_item->conditions[$handler_id]->plugin;
   }
