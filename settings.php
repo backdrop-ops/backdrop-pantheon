@@ -136,6 +136,13 @@ $settings['backup_directory'] = '';
 $settings['hash_salt'] = '';
 
 /**
+ * Handle Hash Salt Value for Backdrop.
+ */
+if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
+  $settings['hash_salt'] = $_ENV['HASH_SALT'];
+}
+
+/**
  * Trusted host configuration (optional but highly recommended).
  *
  * Since the HTTP Host header can be set by the user making the request, it
