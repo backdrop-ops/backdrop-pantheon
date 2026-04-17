@@ -42,6 +42,11 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       name: Checkout code
+    - uses: actions/checkout@v6
+      name: Checkout cspell config
+      with:
+        repository: backdrop-ops/cspell
+        path: .cspell
     - uses: streetsidesoftware/cspell-action@v8
       name: Run CSpell
       with:
