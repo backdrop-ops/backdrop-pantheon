@@ -1016,6 +1016,20 @@ function layout_library_info() {
     ),
   );
 
+  $libraries['layout.admin'] = array(
+    'title' => 'Layout administration',
+    'version' => BACKDROP_VERSION,
+    'css' => array(
+      $path . '/css/layout.admin.css' => array(),
+    ),
+    'js' => array(
+      $path . '/js/layout.admin.js' => array(),
+    ),
+    'icons' => array(
+      'arrows-out-cardinal-fill',
+    ),
+  );
+
   return $libraries;
 }
 
