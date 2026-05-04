@@ -42,6 +42,13 @@ define('FILE_TYPE_STORAGE_OVERRIDE', 2);
  */
 define('FILE_TYPE_STORAGE_DEFAULT', 4);
 
+/**
+ * File entity constants for inline fields within other entity forms.
+ */
+define('FILE_INLINE_FIELDS_ALL', '1');
+define('FILE_INLINE_FIELDS_SOME', '2');
+define('FILE_INLINE_FIELDS_NONE', '0');
+
 // Load all Field module hooks for File.
 require_once BACKDROP_ROOT . '/core/modules/file/file.field.inc';
 
