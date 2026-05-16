@@ -257,6 +257,58 @@ function views_update_1009() {
 }
 
 /**
+ * Use new responsive table column UI rather than custom css class.
+ */
+function views_update_1010() {
+  $views_updated = 0;
+  $view_names = config_get_names_with_prefix('views.view.');
+  foreach ($view_names as $view_name) {
+    $config = config($view_name);
+    $view_updated = FALSE;
+    $displays = $config->get('display');
+    foreach ($displays as $display_key => $display_details) {
+      $fields = $display_details['display_options']['fields'] ?? NULL;
+      $style = $display_details['display_options']['style_plugin'] ?? NULL;
+      if (!$fields || $style !== 'table') {
+        continue;
+      }
+      foreach ($fields as $field_key => $field) {
+        if (!isset($field['element_label_class'])) {
+          continue;
+        }
+        $label_classes = explode(' ', $field['element_label_class']);
+        $has_low = in_array('priority-low', $label_classes);
+        $has_medium = in_array('priority-medium', $label_classes);
+        $label_classes = array_values(array_filter($label_classes, function ($p) {
+          return $p !== 'priority-low' && $p !== 'priority-medium';
+        }));
+        if ($has_low || $has_medium) {
+          $updated_classes = implode(' ', $label_classes);
+          $config->set('display.' . $display_key . '.display_options.fields.' . $field_key . '.element_label_class', $updated_classes);
+          $responsive = '';
+          if ($has_low) {
+            $responsive = 'priority-low';
+          }
+          if ($has_medium) {
+            $responsive = 'priority-medium';
+          }
+          $config->set('display.' . $display_key . '.display_options.style_options.info.' . $field_key . '.responsive', $responsive);
+          $view_updated = TRUE;
+        }
+      }
+    }
+    if ($view_updated) {
+      $views_updated++;
+      $config->save();
+    }
+  }
+
+  if ($views_updated) {
+    return format_plural($views_updated, 'One view updated to move responsive table classes to the table display settings.', '@count views updated to move responsive table classes to the table display settings.');
+  }
+}
+
+/**
  * @} End of "addtogroup updates-7.x-to-1.x"
  * The next series of updates should start at 2000.
  */
