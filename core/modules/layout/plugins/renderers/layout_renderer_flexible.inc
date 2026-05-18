@@ -141,8 +141,7 @@ class LayoutRendererFlexible {
   function addMeta() {
     backdrop_add_library('system', 'backdrop.ajax');
     backdrop_add_library('system', 'ui.sortable');
-    backdrop_add_js(backdrop_get_path('module', 'layout') . '/js/layout.admin.js');
-    backdrop_add_css(backdrop_get_path('module', 'layout') . '/css/layout.admin.css');
+    backdrop_add_library('layout', 'layout.admin');
     backdrop_add_css(backdrop_get_path('module', 'layout') . '/css/layout.flexible.admin.css');
   }
 
@@ -168,7 +167,7 @@ class LayoutRendererFlexible {
       'attributes' => array(
         'class' => array('use-ajax'),
         'data-dialog' => TRUE,
-        'data-dialog-options' => json_encode(array('dialogClass' => 'layout-dialog')),
+        'data-dialog-options' => json_encode(array('classes' => array('ui-dialog' => 'layout-dialog'))),
       ),
     );
     $links['delete'] = array(

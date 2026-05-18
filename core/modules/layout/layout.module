@@ -1013,6 +1013,20 @@ function layout_library_info() {
     ),
   );
 
+  $libraries['layout.admin'] = array(
+    'title' => 'Layout administration',
+    'version' => BACKDROP_VERSION,
+    'css' => array(
+      $path . '/css/layout.admin.css' => array(),
+    ),
+    'js' => array(
+      $path . '/js/layout.admin.js' => array(),
+    ),
+    'icons' => array(
+      'arrows-out-cardinal-fill',
+    ),
+  );
+
   return $libraries;
 }
 
@@ -2792,6 +2806,29 @@ function _layout_clean_custom_css($classes = array()) {
  */
 function layout_field_delete_instance($instance) {
   cache('layout_path')->flush();
+}
+
+/**
+ * Helper to standardize layout template type machine names and ensure we
+ * don't have any namespace issues. If the type is in the reserved list, we can
+ * use them as is, otherwise we'll ensure it starts with 'custom_' before
+ * sending it back.
+ *
+ * @param string|null $layout_template_type
+ *   The custom template type machine name to process, passed by reference. If
+ *   NULL is passed in, the default type of "flexible" will be used.
+ */
+function _layout_standardize_template_type(?string &$layout_template_type = 'flexible') {
+  if (empty($layout_template_type)) {
+    $layout_template_type = 'flexible';
+  }
+  $reserved_types = array(
+    'layout',
+    'flexible',
+  );
+  if (!in_array($layout_template_type, $reserved_types) && strpos($layout_template_type, 'custom_') !== 0) {
+    $layout_template_type = 'custom_' . $layout_template_type;
+  }
 }
 
 /**

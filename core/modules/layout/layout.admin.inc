@@ -191,7 +191,7 @@ function layout_list_page() {
     ),
     '#weight' => -1,
   );
-  $page['#attached']['css'][] = backdrop_get_path('module', 'layout') . '/css/layout.admin.css';
+  $page['#attached']['library'][] = array('layout', 'layout.admin');
   $page['stand_alone'] = array(
     '#type' => 'help',
     '#markup' => '<h2>' . t('Layout pages') . '</h2>' . t('These layouts will create new stand-alone pages on the site.'),
@@ -351,8 +351,7 @@ function layout_settings_form($form, &$form_state, Layout $layout) {
   $form_state['layout'] = &$layout;
   $form['#tree'] = TRUE;
 
-  $form['#attached']['js'][] = backdrop_get_path('module', 'layout') . '/js/layout.admin.js';
-  $form['#attached']['css'][] = backdrop_get_path('module', 'layout') . '/css/layout.admin.css';
+  $form['#attached']['library'][] = array('layout', 'layout.admin');
 
   $messages = array();
   if ($layout->locked) {
@@ -1741,7 +1740,7 @@ function layout_block_add_page(Layout $layout, $renderer_name, $region_name, $bl
           'attributes' => array(
             'class' => array('use-ajax block-item'),
             'data-dialog' => TRUE,
-            'data-dialog-options' => json_encode(array('dialogClass' => 'layout-dialog')),
+            'data-dialog-options' => json_encode(array('classes' => array('ui-dialog' => 'layout-dialog'))),
           )
         )
       ),
@@ -2192,7 +2191,7 @@ function layout_block_configure_ajax_update($form, $form_state) {
     $html .= theme('status_messages');
     $html .= backdrop_render($form);
     $title = isset($form['#title']) ? $form['#title'] : backdrop_get_title();
-    $commands[] = ajax_command_open_modal_dialog($title, $html, array('dialogClass' => 'layout-dialog'));
+    $commands[] = ajax_command_open_modal_dialog($title, $html, array('classes' => array('ui-dialog' => 'layout-dialog')));
   }
   // If a new block, add to the bottom of the region.
   elseif ($added_to_region) {
@@ -3104,8 +3103,7 @@ function layout_menu_item_form($form, &$form_state, LayoutMenuItem $menu_item) {
   $form_state['menu_item'] = $menu_item;
 
   $form['#tree'] = TRUE;
-  $form['#attached']['js'][] = backdrop_get_path('module', 'layout') . '/js/layout.admin.js';
-  $form['#attached']['css'][] = backdrop_get_path('module', 'layout') . '/css/layout.admin.css';
+  $form['#attached']['library'][] = array('layout', 'layout.admin');
 
   $messages = array();
   if ($menu_item->locked) {
@@ -3463,7 +3461,7 @@ function layout_ajax_form_open_dialog($form, &$form_state) {
     else {
       $title = $router_item['title'];
     }
-    $commands[] = ajax_command_open_modal_dialog($title, $html, array('dialogClass' => 'layout-dialog'));
+    $commands[] = ajax_command_open_modal_dialog($title, $html, array('classes' => array('ui-dialog' => 'layout-dialog')));
   }
 
   return array(
@@ -3501,7 +3499,7 @@ function layout_ajax_form_save_dialog($form, $form_state) {
     $html .= theme('status_messages');
     $html .= backdrop_render($form);
     $title = isset($form['#title']) ? $form['#title'] : backdrop_get_title();
-    $commands[] = ajax_command_open_modal_dialog($title, $html, array('dialogClass' => 'layout-dialog'));
+    $commands[] = ajax_command_open_modal_dialog($title, $html, array('classes' => array('ui-dialog' => 'layout-dialog')));
   }
   else {
     // If there is a part of the page that needs to be updated, update it.
@@ -3551,7 +3549,7 @@ function layout_ajax_form_save_title_dialog($form, $form_state) {
     $html .= theme('status_messages');
     $html .= backdrop_render($form);
     $title = isset($form['#title']) ? $form['#title'] : backdrop_get_title();
-    $commands[] = ajax_command_open_modal_dialog($title, $html, array('dialogClass' => 'layout-dialog'));
+    $commands[] = ajax_command_open_modal_dialog($title, $html, array('classes' => array('ui-dialog' => 'layout-dialog')));
   }
   else {
     // Rebuild the title area description.
@@ -3686,7 +3684,7 @@ function layout_settings_page($form, &$form_state) {
     }
   }
 
-  $form['#attached']['css'][] = backdrop_get_path('module', 'layout') . '/css/layout.admin.css';
+  $form['#attached']['library'][] = array('layout', 'layout.admin');
   $form['templates'] = array(
     '#type' => 'tableselect',
     '#js_select' => FALSE,
