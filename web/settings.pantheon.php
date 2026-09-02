@@ -88,12 +88,15 @@ if (isset($_ENV['PANTHEON_ENVIRONMENT'])) {
 }
 
 /**
- * Using legacy format for database connection settings and config directories,
- * to ensure existing sites that may be relying on these settings continue to
- * work.
- *
- * Issue: https://github.com/backdrop-ops/backdrop-pantheon/issues/73
+ * We put the active configuration in the database by default (though it can
+ * be optionally set to be stored in the filesystem).
+ */
+$settings['config_active_class'] = 'ConfigDatabaseStorage';
+
+/**
+ * The files/config directory has been added to the protected_web_paths list in
+ * pantheon.upstream.yml, so we don't use the default randomized hash.
  */
 $database = 'mysql://user:pass@localhost/database_name';
-$config_directories['active'] = 'files/config_' . md5($database) . '/active';
-$config_directories['staging'] = 'files/config_' . md5($database) . '/staging';
+$config_directories['active'] = 'files/config/active';
+$config_directories['staging'] = 'files/config/staging';
