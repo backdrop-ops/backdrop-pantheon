@@ -1644,7 +1644,7 @@ class UserAdminTestCase extends BackdropWebTestCase {
 
 class UserAdminSettingsFormTest extends SystemConfigFormCase {
   public function setUp() {
-    parent::setUp('contact');
+    parent::setUp('path');
     module_load_include('admin.inc', 'user');
     $this->form_id = 'user_admin_settings';
     $this->values = array(
@@ -1653,12 +1653,12 @@ class UserAdminSettingsFormTest extends SystemConfigFormCase {
         '#config_name' => 'system.core',
         '#config_key' => 'user_picture_path',
       ),
-      // The contact_default_status item tests saving via
+      // The path_pattern item tests saving via
       // system_config_settings() to a second config file.
-      'contact_default_status' => array(
-        '#value' => NULL,
-        '#config_name' => 'contact.settings',
-        '#config_key' => 'contact_default_status',
+      'path_pattern' => array(
+        '#value' => 'accounts/[user:name]',
+        '#config_name' => 'path.settings',
+        '#config_key' => 'user_pattern',
       ),
     );
   }
@@ -1759,7 +1759,7 @@ class UserAutocompleteTestCase extends BackdropWebTestCase {
   protected $privileged_user;
 
   function setUp() {
-    parent::setUp();
+    parent::setUp('form_test');
 
     // Set up two users with different permissions to test access.
     $this->unprivileged_user = $this->backdropCreateUser();
@@ -1779,6 +1779,20 @@ class UserAutocompleteTestCase extends BackdropWebTestCase {
     $this->backdropLogout();
     $this->backdropLogin($this->privileged_user);
     $this->backdropGet('user/autocomplete/' . $this->unprivileged_user->name[0]);
+    $this->assertResponse(403, 'Autocompletion access denied without a token.');
+    $this->backdropGet('user/autocomplete/' . $this->unprivileged_user->name[0], array(
+      'query' => array('token' => 'invalid'),
+    ));
+    $this->assertResponse(403, 'Autocompletion access denied with an invalid token.');
+
+    // Get a valid autocomplete token from a form with a user autocomplete field.
+    $this->backdropGet('form-test/autocomplete');
+    $elements = $this->xpath('//input[@id="edit-user-textfield-autocomplete"]');
+    $token = (string) $elements[0]['data-autocomplete-token'];
+    $this->assertTrue($token, 'Autocomplete token found on a form with an autocomplete field.');
+    $this->backdropGet('user/autocomplete/' . $this->unprivileged_user->name[0], array(
+      'query' => array('token' => $token),
+    ));
     $this->assertResponse(200, 'Autocompletion access allowed.');
 
     // Using first letter of the user's name, make sure the user's full name is in the results.
@@ -1966,8 +1980,8 @@ class UserCreateTestCase extends BackdropWebTestCase {
 
     // Test user creation page for valid fields.
     $this->backdropGet('admin/people/create');
-    $this->assertFieldbyId('edit-status-0', 0, 'The user status option Blocked exists.', 'User login');
-    $this->assertFieldbyId('edit-status-1', 1, 'The user status option Active exists.', 'User login');
+    $this->assertFieldById('edit-status-0', 0, 'The user status option Blocked exists.', 'User login');
+    $this->assertFieldById('edit-status-1', 1, 'The user status option Active exists.', 'User login');
     $this->assertFieldByXPath('//input[@type="radio" and @id="edit-status-1" and @checked="checked"]', NULL, 'Default setting for user status is active.');
 
     // We create two users, notifying one and not notifying the other, to
