@@ -6,7 +6,7 @@ api_version: 1
 php_version: 8.4
 web_docroot: true
 database:
-  version: 11.4
+  version: 10.4
 drush_version: 8
 filemount: /files
 protected_web_paths:
